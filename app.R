@@ -19,23 +19,25 @@ library(dplyr)
 
 source("./finanzkonten_mod.R")
 source("./auswertunggiro_mod.R")
+source("./investieren_mod.R")
 source("./upload.R")
 
 ################################################################################
 # LOAD DATA ####################################################################
+DATAPATH <- "./DATA/"
 
 # finanzkonten file names - are IDentifier for each konto
-filenames_csv <- list.files(path = "./DATA/")
+filenames_csv <- list.files(path = DATAPATH)
 filenames_csv <- filenames_csv[filenames_csv != "gruppen.csv"]
 
 # funciton to load csv files
-load_finanzkonten <- function(finanzkonto) {
-  file_path <- paste0("./DATA/", finanzkonto)
-  if (!file.exists(file_path)) {
-    message("File does not exist:", file_path)
+load_finanzkonten <- function(finanzkonto_file) {
+  filepath <- paste0(DATAPATH, finanzkonto_file)
+  if (!file.exists(filepath)) {
+    message("File does not exist:", filepath)
     return(NULL)  # Return NULL if the file does not exist
   }
-  read.csv(file_path, comment.char = "#")
+  read.csv(filepath, comment.char = "#")
 }
 
 # Initialize the finanzkonto list (this will store all accounts)
@@ -45,34 +47,39 @@ finanzkonto <- list()
 # Loop through each account and load the data dynamically
 for(i in filenames_csv) {
   
-  info  <- readLines(paste0("./DATA/", i))
+  # read header from csv files
+  info  <- readLines(paste0(DATAPATH, i))
   bank  <- trimws(gsub(".*:", "", info[1]))
   konto <- trimws(gsub(".*:", "", info[2]))
   display_name  <- paste0(bank, " - ", konto)
+  # ID is filename, wihtout ending
+  ID <- gsub("*.csv", "", i)
   
   tryCatch({
     # Load the data for the current ID
-    account_data <- load_finanzkonten(i)
-    ID <- gsub("*.csv", "", i)
-    # Only add to finanzkonto if the data is not NULL
-    if (!is.null(account_data)) {
+    account_data <- load_finanzkonten(finanzkonto_file = i)
+
+    if (!is.null(account_data)) { # Only add to finanzkonto if the data is not NULL
       finanzkonto[[ID]] <- list(
         name = ID,  
         display_name = display_name,
+        bank = bank,
+        konto = konto,
         data = account_data
       )
-    } else {
-      message(paste("Data is NULL for", ID))
-    }
-  }, error = function(e) {
+    } else message(paste("Data is NULL for", ID))
+    
+  }, error = function(e) { # if loading for data failed
     message(paste("Error loading data for", ID, ":", e$message))
   })
-  #options(show.error.messages = TRUE)
-  
+
+  # bank_konto contains info on konten  
   konto <- data.frame(bank = bank, konto = konto, name = display_name, ID = ID)
   bank_konto <- bind_rows(konto, bank_konto)
   
 }
+
+
 
 
 ################################################################################
@@ -83,8 +90,10 @@ ui <- page_fluid(
     tabPanel("Finanzkonten", 
              finanzkontenUI("finanzkonten", finanzkonto, bank_konto)  # Call the UI function from the module
     ),
-    tabPanel("Girokonten - Auswertung",
+    tabPanel("Girokonten",
              auswertunggiroUI("auswertunggiro", finanzkonto)),
+    tabPanel("Investieren",
+             investierenUI("investieren", finanzkonto)),
     tabPanel("Upload",
              uploadUI("upload", finanzkonto))
   )
@@ -98,6 +107,7 @@ ui <- page_fluid(
 server <- function(input, output, session) {
   finanzkontenServer("finanzkonten", finanzkonto, bank_konto)  # Call the server function from the module
   auswertunggiroServer("auswertunggiro", finanzkonto)
+  investierenServer("investieren", finanzkonto)
   uploadServer("upload", finanzkonto)
 }
 

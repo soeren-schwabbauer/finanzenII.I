@@ -8,9 +8,10 @@ finanzkontenUI <- function(id, finanzkonto, bank_konto) {
   # Generate dynamic accordion panels for each account in finanzkonto list
   accordion_panels <- lapply(finanzkonto, function(account) {
     account_id <- account$name  # Unique name for each account, used for output ID
+    bank <- account$bank
     accordion_panel(
       title = account$display_name,  # Display name for the panel title
-      icon = bsicons::bs_icon("credit-card"),
+      icon = img(src = paste0("icons/", bank, ".png"), style = "width: 20px; height: 20px;"),  # Custom icon with inline style
       fluidRow(
         column(12,
                DTOutput(ns(account_id))  # Dynamic output ID for each account
