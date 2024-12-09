@@ -18,8 +18,8 @@ library(tibble)
 library(dplyr)
 
 source("./finanzkonten_mod.R")
-source("./auswertunggiro_mod.R")
-source("./investieren_mod.R")
+source("./girokonten_mod.R")
+source("./depots_mod.R")
 source("./upload.R")
 
 ################################################################################
@@ -79,21 +79,22 @@ for(i in filenames_csv) {
   
 }
 
-
-
+uebersicht <- finanzkonto
+girokonten <- Filter(function(x) x$konto %in% c("GIRO", "EXTRAKONTO", "GUTHABEN"), finanzkonto)
+depots     <- Filter(function(x) x$konto %in% c("DEPOT"), finanzkonto)
 
 ################################################################################
 # UI ###########################################################################
 
 ui <- page_fluid(
   tabsetPanel(
-    tabPanel("Finanzkonten", 
-             finanzkontenUI("finanzkonten", finanzkonto, bank_konto)  # Call the UI function from the module
+    tabPanel("Übersicht", 
+             uebersichtUI("uebersicht", uebersicht, bank_konto)  # Call the UI function from the module
     ),
     tabPanel("Girokonten",
-             auswertunggiroUI("auswertunggiro", finanzkonto)),
-    tabPanel("Investieren",
-             investierenUI("investieren", finanzkonto)),
+             girokontenUI("girokonten", girokonten)),
+    tabPanel("Depots",
+             depotsUI("depots", depots)),
     tabPanel("Upload",
              uploadUI("upload", finanzkonto))
   )
@@ -105,9 +106,9 @@ ui <- page_fluid(
 # SERVER #######################################################################
 # Define the server logic for the main app
 server <- function(input, output, session) {
-  finanzkontenServer("finanzkonten", finanzkonto, bank_konto)  # Call the server function from the module
-  auswertunggiroServer("auswertunggiro", finanzkonto)
-  investierenServer("investieren", finanzkonto)
+  uebersichtServer("uebersicht", uebersicht, bank_konto)  # Call the server function from the module
+  girokontenServer("girokonten", girokonten)
+  depotsServer("depots", depots)
   uploadServer("upload", finanzkonto)
 }
 
