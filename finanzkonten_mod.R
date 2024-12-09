@@ -1,25 +1,10 @@
 
 # verwendet wird das kontosaldo, bzw. der gegenwärtige depotwert.
 
-finanzkontenUI <- function(id, finanzkonto, bank_konto) {
+uebersichtUI <- function(id, uebersicht, bank_konto) {
   
   ns <- NS(id) 
-  
-  # Generate dynamic accordion panels for each account in finanzkonto list
-  accordion_panels <- lapply(finanzkonto, function(account) {
-    account_id <- account$name  # Unique name for each account, used for output ID
-    bank <- account$bank
-    accordion_panel(
-      title = account$display_name,  # Display name for the panel title
-      icon = img(src = paste0("icons/", bank, ".png"), style = "width: 20px; height: 20px;"),  # Custom icon with inline style
-      fluidRow(
-        column(12,
-               DTOutput(ns(account_id))  # Dynamic output ID for each account
-        )
-      )
-    )
-  })
-  
+
   # Return the UI structure with all dynamically created accordion panels
   tagList(
     fluidRow(
@@ -38,24 +23,19 @@ finanzkontenUI <- function(id, finanzkonto, bank_konto) {
                                    choices = c("Absolut", "Prozent"),
                                    inline = TRUE)),
              ),
-             highchartOutput(ns("treemap_finanzkonten")),
-             accordion(
-               # Insert all dynamic account accordion panels here
-               do.call(tagList, accordion_panels),
-               open = FALSE  # Default open section
-             )
+             highchartOutput(ns("treemap_finanzkonten"))
       )
     )
   )
 }
 
 
-finanzkontenServer <- function(id, finanzkonto, bank_konto) {
+uebersichtServer <- function(id, uebersicht, bank_konto) {
   moduleServer(id, function(input, output, session) {
     
     output$treemap_finanzkonten <- renderHighchart({
       
-      data <- lapply(finanzkonto, function(list) list[["data"]])
+      data <- lapply(uebersicht, function(list) list[["data"]])
       lookup <- c("TOTAL" = "SALDO", "TOTAL" = "GESAMTWERT")
     
       total <- lapply(names(data), 
@@ -119,26 +99,6 @@ finanzkontenServer <- function(id, finanzkonto, bank_konto) {
       return(hc)
       
     })
-    
-    
-    
-    # Loop over each account in the finanzkonto list
-    lapply(finanzkonto, function(account) {
-      account_id <- account$name  # Unique ID for each account
-      account_data <- account$data  # Data for the account
-      
-      # Dynamically create a renderDT for each account's data table
-      output[[account_id]] <- renderDT({
-        req(account_data)  # Ensure the data is available
-        DT::datatable(
-          account_data,
-          rownames = FALSE,
-          filter = 'top',
-          options = list(pageLength = -1, dom = 't')
-        )
-      })
-    })
-    
   })
 }
 

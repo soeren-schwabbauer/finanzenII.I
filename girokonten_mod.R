@@ -249,12 +249,39 @@ tabelle <- function(info) {
 # UI ===========================================================================
 # ==============================================================================
 
-auswertunggiroUI <- function(id, finanzkonto) {
+girokontenUI <- function(id, girokonten) {
   
   ns <- NS(id)  # Namespace function to scope the module
   
+  accordion_panels <- lapply(girokonten, function(account) {
+    account_id <- account$name  # Unique name for each account, used for output ID
+    bank <- account$bank
+    saldo <- format(account$data$SALDO[1], big.mark = ".", decimal.mark = ",")
+    accordion_panel(
+      title = paste0(account$display_name, " | ", saldo, "€"),  # Display name for the panel title
+      icon = img(src = paste0("icons/", bank, ".png"), style = "width: 20px; height: 20px;"),  # Custom icon with inline style
+      fluidRow(
+        column(12,
+               DTOutput(ns(account_id))  # Dynamic output ID for each account
+        )
+      )
+    )
+  })
+  
   tagList(
     fluidRow(
+
+      h1(""), h1(""),
+      column(12, 
+             accordion(
+               # Insert all dynamic account accordion panels here
+               do.call(tagList, accordion_panels),
+               open = FALSE  # Default open section
+             )
+      ),
+      
+      h1(""), tags$head(tags$style(HTML("hr {border-top: 10px solid #111111;}"))), h1(""),
+
       column(12,
              accordion(
                accordion_panel(
@@ -335,16 +362,32 @@ auswertunggiroUI <- function(id, finanzkonto) {
 # SERVER =======================================================================
 # ==============================================================================
 
-auswertunggiroServer <- function(id, finanzkonto) {
+girokontenServer <- function(id, girokonten) {
   moduleServer(id, function(input, output, session) {
     
     # prepare data for page ----------------------------------------------------
+    # Loop over each account in the finanzkonto list
+    lapply(girokonten, function(account) {
+      account_id <- account$name  # Unique ID for each account
+      account_data <- account$data  # Data for the account
+      
+      # Dynamically create a renderDT for each account's data table
+      output[[account_id]] <- renderDT({
+        req(account_data)  # Ensure the data is available
+        DT::datatable(
+          account_data,
+          rownames = FALSE,
+          filter = 'top',
+          options = list(pageLength = -1, dom = 't')
+        )
+      })
+    })
     
     # komplette daten
     GIR_allekategorien <- reactive({
       
       # Girokonten sind konten mit GIR oder GTH im Namen
-      GIR <- bind_rows(lapply(finanzkonto[grepl("GIR|GTH|EXT", names(finanzkonto))], function(list) list[["data"]])) %>%
+      GIR <- bind_rows(lapply(girokonten, function(list) list[["data"]])) %>%
         
         mutate(DATUM = as.Date(DATUM)) %>%
         # filter date aus auswahl - zuerst, um speed zu erhöhen für join der kategorien
