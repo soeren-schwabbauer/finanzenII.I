@@ -368,20 +368,50 @@ girokontenServer <- function(id, girokonten) {
     # prepare data for page ----------------------------------------------------
     # Loop over each account in the finanzkonto list
     lapply(girokonten, function(account) {
-      account_id <- account$name  # Unique ID for each account
-      account_data <- account$data  # Data for the account
+      account_id <- account$name  # Assuming 'name' is the account ID
+      bank <- account$bank
+      konto <- account$konto
       
-      # Dynamically create a renderDT for each account's data table
+      # Render the editable DataTable for each account
       output[[account_id]] <- renderDT({
-        req(account_data)  # Ensure the data is available
+        req(account$data)  # Ensure account data is available
         DT::datatable(
-          account_data,
+          account$data,
           rownames = FALSE,
           filter = 'top',
-          options = list(pageLength = -1, dom = 't')
+          options = list(pageLength = -1, dom = 't'),
+          editable = TRUE  # Enable cell editing
         )
       })
+      
+      # Capture the edits and save to the respective CSV file dynamically
+      observeEvent(input[[paste0(account_id, '_cell_edit')]], {
+        info <- input[[paste0(account_id, '_cell_edit')]]
+        
+        # Update the account's data with the edited value
+        edited_data <- account$data
+        edited_data[info$row, info$col + 1] <- info$value  # Update the correct cell
+        
+        # Define file path
+        file_name <- paste0("./DATA/", account_id, ".csv")
+        
+        # Write the comment lines first
+        comment_bank <- paste0("# bank:  ", bank)
+        comment_konto <- paste0("# konto: ", konto)
+        
+        # Write the comments (if not already in the file)
+        write_lines(comment_bank, file_name)  # Write the bank comment
+        write_lines(comment_konto, file_name, append = TRUE)  # Write the konto comment
+        
+        # Check if file exists and is not empty
+          # Write the column names as the second line (if the file doesn't exist or is empty)
+          write_lines(paste(colnames(edited_data), collapse = ","), file_name, append = TRUE)
+        
+        # Append the actual data using write_csv (without column names)
+        write_csv(edited_data, file_name, append = TRUE)
+      })
     })
+
     
     # komplette daten
     GIR_allekategorien <- reactive({
