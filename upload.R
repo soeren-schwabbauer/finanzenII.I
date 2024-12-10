@@ -154,7 +154,8 @@ uploadServer <- function(id, finanzkonto) {
     
     # Store old data from the selected account
     olddata <- reactive({ finanzkonto[[input$select_konto]]$data })
-    
+    bank <- reactive({ finanzkonto[[input$select_konto]]$bank })
+    konto <- reactive({ finanzkonto[[input$select_konto]]$konto })
     # Process new data after file upload
     newdata <- reactive({
       file <- input$upload_file
@@ -193,8 +194,28 @@ uploadServer <- function(id, finanzkonto) {
           x <- newdata()
           cat("\n", intToUtf8(0x2139), "Depot hochgeladen")
       }
-        write.csv(x, file = paste0("./DATA/", input$select_konto, ".csv"), row.names = FALSE)
+        
+        # Define file path
+        file_name <- paste0("./DATA/", input$select_konto, ".csv")
+        
+        # Write the comment lines first
+        comment_bank <- paste0("# bank:  ", bank())
+        comment_konto <- paste0("# konto: ", konto())
+        
+        # Write the comments (if not already in the file)
+        write_lines(comment_bank, file_name)  # Write the bank comment
+        write_lines(comment_konto, file_name, append = TRUE)  # Write the konto comment
+        
+        # Check if file exists and is not empty
+        # Write the column names as the second line (if the file doesn't exist or is empty)
+        write_lines(paste(colnames(x), collapse = ","), file_name, append = TRUE)
+        
+        # Append the actual data using write_csv (without column names)
+        write_csv(x, file_name, append = TRUE)
+        
+        #write.csv(x, file = paste0("./DATA/", input$select_konto, ".csv"), row.names = FALSE)
         cat("\n", intToUtf8(0x2139), "Neues File überschrieben")
+        
         
       # Show confirmation notification
       showNotification("File uploaded successfully!", type = "message", duration = 3)
