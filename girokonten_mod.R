@@ -317,12 +317,14 @@ girokontenUI <- function(id, girokonten) {
                  title = "Verlauf", 
                  icon = bsicons::bs_icon("graph-up"),
                  fluidRow(
-                   column(4, 
+                   column(6, 
                           radioButtons(ns("verlauf_art"), "Verlauf für:",
-                                       choices = c("Einnahmen", "Ausgaben", "Verhältnis"))),
-                   column(4,
+                                       choices = c("Einnahmen", "Ausgaben", "Verhältnis"),
+                                       inline = TRUE)),
+                   column(6,
                           radioButtons(ns("verlauf_smooth"), "Werte anzeigen als:",
-                                       choices = c("Total", "Mittelwert", "3-Monats Mittel")))
+                                       choices = c("Total", "Mittelwert", "3-Monats Mittel"),
+                                       inline = TRUE))
                  ),
                  highchartOutput(ns("verlauf_plot"))  # Render Einnahmen plot here
                ),
