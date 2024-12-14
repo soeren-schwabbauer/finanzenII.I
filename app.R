@@ -1,102 +1,91 @@
+
+rm(list = ls())
+
+# for shiny
 library(shiny)
 library(bslib)
-library(highcharter)
+library(shinyWidgets)
+
+# dataprep
 library(stringr)
 library(magrittr)
 library(tidyr)
-library(igraph)
-library(reactable)
-library(DT)
-library(visNetwork)
-library(shinyWidgets)
 library(readr)
 library(scales)
 library(lubridate)
-library(RColorBrewer)
 library(tibble)
+
+# data depiction
+library(highcharter)
+library(igraph)
+library(RColorBrewer)
+library(reactable)
+library(DT)
+library(visNetwork)
+
+# for API
+library(httr)
+library(jsonlite)
+#library(GET)
 
 library(dplyr)
 
+# function to overwrite data with comments
+source("./functions/overwrite_DATA.R")
+
+# define datapath
+DATAPATH <<- "./DATA/"
+
+
+################################################################################
+# load modules for shiny app ###################################################
 source("./finanzkonten_mod.R")
 source("./girokonten_mod.R")
 source("./depots_mod.R")
+source("./wallets_mod.R")
 source("./upload.R")
+
 
 ################################################################################
 # LOAD DATA ####################################################################
-DATAPATH <- "./DATA/"
 
-# finanzkonten file names - are IDentifier for each konto
-filenames_csv <- list.files(path = DATAPATH)
-filenames_csv <- filenames_csv[filenames_csv != "gruppen.csv"]
+# scrape API data & load into csv DATA -----------------------------------------
 
-# funciton to load csv files
-load_finanzkonten <- function(finanzkonto_file) {
-  filepath <- paste0(DATAPATH, finanzkonto_file)
-  if (!file.exists(filepath)) {
-    message("File does not exist:", filepath)
-    return(NULL)  # Return NULL if the file does not exist
-  }
-  read.csv(filepath, comment.char = "#")
-}
+source("./functions/live_BIPGATWWXXX.R")
 
-# Initialize the finanzkonto list (this will store all accounts)
-bank_konto <- data.frame()
-finanzkonto <- list()
 
-# Loop through each account and load the data dynamically
-for(i in filenames_csv) {
-  
-  # read header from csv files
-  info  <- readLines(paste0(DATAPATH, i))
-  bank  <- trimws(gsub(".*:", "", info[1]))
-  konto <- trimws(gsub(".*:", "", info[2]))
-  display_name  <- paste0(bank, " - ", konto)
-  # ID is filename, wihtout ending
-  ID <- gsub("*.csv", "", i)
-  
-  tryCatch({
-    # Load the data for the current ID
-    account_data <- load_finanzkonten(finanzkonto_file = i)
 
-    if (!is.null(account_data)) { # Only add to finanzkonto if the data is not NULL
-      finanzkonto[[ID]] <- list(
-        name = ID,  
-        display_name = display_name,
-        bank = bank,
-        konto = konto,
-        data = account_data
-      )
-    } else message(paste("Data is NULL for", ID))
-    
-  }, error = function(e) { # if loading for data failed
-    message(paste("Error loading data for", ID, ":", e$message))
-  })
+# from static csv files --------------------------------------------------------
+source("./functions/csv_RESIDUALBANKS.R")
 
-  # bank_konto contains info on konten  
-  konto <- data.frame(bank = bank, konto = konto, name = display_name, ID = ID)
-  bank_konto <- bind_rows(konto, bank_konto)
-  
-}
+finanzkonto <- load_csv(DATAPATH)
 
 uebersicht <- finanzkonto
 girokonten <- Filter(function(x) x$konto %in% c("GIRO", "EXTRAKONTO", "GUTHABEN"), finanzkonto)
 depots     <- Filter(function(x) x$konto %in% c("DEPOT"), finanzkonto)
+wallets    <- Filter(function(x) x$konto %in% c("WALLET"), finanzkonto)
+
+
+
+# create dataframe with IDs ---------------------------------------------------- 
+
+bank_konto <- lapply(finanzkonto, function(x) {
+  data.frame(bank = x$bank, konto = x$konto, display_name = x$display_name, ID = x$name)
+})
+
+bank_konto <- bind_rows(bank_konto) 
+
 
 ################################################################################
 # UI ###########################################################################
 
 ui <- page_fluid(
   tabsetPanel(
-    tabPanel("Übersicht", 
-             uebersichtUI("uebersicht", uebersicht, bank_konto)  # Call the UI function from the module
-    ),
-    tabPanel("Girokonten",
-             girokontenUI("girokonten", girokonten)),
-    tabPanel("Depots",
-             depotsUI("depots", depots)),
-    tabPanel("Upload",
-             uploadUI("upload", finanzkonto))
+    tabPanel("Übersicht", uebersichtUI("uebersicht", uebersicht, bank_konto)),
+    tabPanel("Girokonten", girokontenUI("girokonten", girokonten)),
+    tabPanel("Depots", depotsUI("depots", depots)),
+    tabPanel("Wallets", walletsUI("wallets", wallets)),
+    tabPanel("Upload", uploadUI("upload", finanzkonto))
   )
 )
 
@@ -106,10 +95,13 @@ ui <- page_fluid(
 # SERVER #######################################################################
 # Define the server logic for the main app
 server <- function(input, output, session) {
-  uebersichtServer("uebersicht", uebersicht, bank_konto)  # Call the server function from the module
+  
+  uebersichtServer("uebersicht", uebersicht, bank_konto)
   girokontenServer("girokonten", girokonten)
   depotsServer("depots", depots)
+  walletsServer("wallets", wallets)
   uploadServer("upload", finanzkonto)
+  
 }
 
 
