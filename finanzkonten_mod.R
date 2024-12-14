@@ -16,7 +16,7 @@ uebersichtUI <- function(id, uebersicht, bank_konto) {
                                    choices = c("Insgesammt" = "insgesammt", 
                                                "Kontoart" = "konto",
                                                "Bank" = "bank",
-                                               "Konto" = "name"),
+                                               "Konto" = "display_name"),
                                    inline = TRUE)),
                column(6, 
                       radioButtons(ns("treemap_values"), "Werte in",
@@ -41,7 +41,7 @@ uebersichtServer <- function(id, uebersicht, bank_konto) {
       total <- lapply(names(data), 
                       function(name) {
                         df <- data[[name]]
-                        if(str_detect(name, "DEP")) df %<>% summarise(GESAMTWERT = sum(GESAMTWERT))
+                        if(str_detect(name, "DEP|WAL")) df %<>% summarise(GESAMTWERT = sum(GESAMTWERT))
                         df %<>% 
                           slice(1) %>% # first row
                           select_if(names(.) %in% c("SALDO", "GESAMTWERT")) %>%
