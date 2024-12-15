@@ -1,7 +1,7 @@
 
 # verwendet wird das kontosaldo, bzw. der gegenwärtige depotwert.
 
-uebersichtUI <- function(id, uebersicht, bank_konto) {
+uebersichtUI <- function(id, finanzkonto, bank_konto) {
   
   ns <- NS(id) 
 
@@ -30,12 +30,12 @@ uebersichtUI <- function(id, uebersicht, bank_konto) {
 }
 
 
-uebersichtServer <- function(id, uebersicht, bank_konto) {
+uebersichtServer <- function(id, finanzkonto, bank_konto) {
   moduleServer(id, function(input, output, session) {
     
     output$treemap_finanzkonten <- renderHighchart({
       
-      data <- lapply(uebersicht, function(list) list[["data"]])
+      data <- lapply(finanzkonto, function(list) list[["data"]])
       lookup <- c("TOTAL" = "SALDO", "TOTAL" = "GESAMTWERT")
     
       total <- lapply(names(data), 

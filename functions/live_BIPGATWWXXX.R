@@ -107,7 +107,7 @@ tryCatch({
   # Preis für jeden Coin ---------------
   coins <- wallet_neu %>% distinct(COIN) %>%
                           # live preis für jeden Coin in wallet ermitteln
-                          mutate(PREIS = as.numeric(read_data(url_prices)[[i]][["EUR"]])) 
+                          mutate(PREIS = as.numeric(read_data(url_prices)[[COIN]][["EUR"]])) 
   
   # Wert für jeden Coint ---------------
   wallet_neu <- wallet_neu %>% left_join(coins, by = "COIN") %>% 

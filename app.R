@@ -24,6 +24,7 @@ library(DT)
 library(visNetwork)
 
 # for API
+library(rvest)
 library(httr)
 library(jsonlite)
 #library(GET)
@@ -32,9 +33,12 @@ library(dplyr)
 
 # function to overwrite data with comments
 source("./functions/overwrite_DATA.R")
+# function to read data into list
+source("./functions/listread_DATA.R")
 
-# define datapath
+# define global variabales
 DATAPATH <<- "./DATA/"
+FINANZKONTEN_ID <<- list.files(DATAPATH)[!str_detect(list.files(DATAPATH), "gruppen.csv")] # used in listread_DATA to get all files
 
 
 ################################################################################
@@ -43,27 +47,30 @@ source("./finanzkonten_mod.R")
 source("./girokonten_mod.R")
 source("./depots_mod.R")
 source("./wallets_mod.R")
-source("./upload.R")
+source("./upload_mod.R")
+
+
+################################################################################
+# LIVE DATA ####################################################################
+
+# scrape API data & load into csv DATA -----------------------------------------
+source("./functions/live_BIPGATWWXXX.R")
+
+# update live prices for depots ------------------------------------------------
+source("./functions/live_depots_prices.R")
 
 
 ################################################################################
 # LOAD DATA ####################################################################
 
-# scrape API data & load into csv DATA -----------------------------------------
-
-source("./functions/live_BIPGATWWXXX.R")
-
-
-
 # from static csv files --------------------------------------------------------
-source("./functions/csv_RESIDUALBANKS.R")
 
-finanzkonto <- load_csv(DATAPATH)
+finanzkonto <- listread_DATA(DATAPATH)
+girokonten  <- listread_DATA(DATAPATH, filter_typID = c("GIR", "EXT", "GTH"))
+depots      <- listread_DATA(DATAPATH, filter_typID = "DEP")
+wallets     <- listread_DATA(DATAPATH, filter_typID = "WAL") 
 
-uebersicht <- finanzkonto
-girokonten <- Filter(function(x) x$konto %in% c("GIRO", "EXTRAKONTO", "GUTHABEN"), finanzkonto)
-depots     <- Filter(function(x) x$konto %in% c("DEPOT"), finanzkonto)
-wallets    <- Filter(function(x) x$konto %in% c("WALLET"), finanzkonto)
+
 
 
 
@@ -81,7 +88,7 @@ bank_konto <- bind_rows(bank_konto)
 
 ui <- page_fluid(
   tabsetPanel(
-    tabPanel("Übersicht", uebersichtUI("uebersicht", uebersicht, bank_konto)),
+    tabPanel("Übersicht", uebersichtUI("uebersicht", finanzkonto, bank_konto)),
     tabPanel("Girokonten", girokontenUI("girokonten", girokonten)),
     tabPanel("Depots", depotsUI("depots", depots)),
     tabPanel("Wallets", walletsUI("wallets", wallets)),
@@ -96,7 +103,7 @@ ui <- page_fluid(
 # Define the server logic for the main app
 server <- function(input, output, session) {
   
-  uebersichtServer("uebersicht", uebersicht, bank_konto)
+  uebersichtServer("uebersicht", finanzkonto, bank_konto)
   girokontenServer("girokonten", girokonten)
   depotsServer("depots", depots)
   walletsServer("wallets", wallets)

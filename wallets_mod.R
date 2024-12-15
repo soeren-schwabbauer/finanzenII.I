@@ -62,7 +62,6 @@ walletsServer <- function(id, wallets) {
         DT::datatable(
           account_data,
           rownames = FALSE,
-          filter = 'top',
           escape = FALSE,  # Allows HTML rendering
           options = list(pageLength = -1, dom = 't')
         )

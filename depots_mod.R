@@ -42,6 +42,19 @@ depotsServer <- function(id, depots) {
       account_id <- account$name  # Unique ID for each account
       account_data <- account$data  # Data for the account
       
+      # Dynamically add icons for the ISIN column
+      if ("ISIN" %in% colnames(account_data)) {
+        account_data$ISIN <- sapply(account_data$ISIN, function(isin) {
+          icon_path <- paste0("www/icons_depots/", isin, ".png")  # Assume file name matches coin value
+          cat(file.exists(icon_path))
+          if (file.exists(icon_path)) {
+            paste0('<img src= "icons_depots/', isin, '.png" style="height:40px;width:40px;"></img>')
+          } else {
+            isin  # Fallback to showing the coin value if the file doesn't exist
+          }
+        })
+      }
+      
       # Dynamically create a renderDT for each account's data table
       output[[account_id]] <- renderDT({
         req(account_data)  # Ensure the data is available
@@ -49,6 +62,7 @@ depotsServer <- function(id, depots) {
           account_data,
           rownames = FALSE,
           filter = 'top',
+          escape = FALSE,  # Allows HTML rendering
           options = list(pageLength = -1, dom = 't')
         )
       })
