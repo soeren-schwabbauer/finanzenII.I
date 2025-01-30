@@ -2,12 +2,15 @@
 # each list is a konto, containing the data and a header
 
 # filter_typID is _* ID in name of csv file
-listread_DATA <- function(datapath = DATAPATH, filter_typID = FINANZKONTEN_ID) {
+read_MANUALDATA <- function(datapath) {
 
+  message("... loading MANUALDATA")
+  
   # finanzkonten file names - are IDentifier for each konto
   filenames_csv <- list.files(path = datapath)
   filenames_csv <- filenames_csv[filenames_csv != "gruppen.csv"]
   
+  filter_typID <- list.files(datapath)[!str_detect(list.files(datapath), "gruppen.csv")]
   filenames_csv <- filenames_csv[str_detect(filenames_csv, str_c(filter_typID, collapse = "|"))]  
   
   # funciton to load csv files
@@ -37,7 +40,9 @@ listread_DATA <- function(datapath = DATAPATH, filter_typID = FINANZKONTEN_ID) {
     
     tryCatch({
       # Load the data for the current ID
-      account_data <- load_finanzkonten(finanzkonto_file = i)
+      account_data <- load_finanzkonten(finanzkonto_file = i) %>%
+        mutate(DATUM = as.Date(DATUM)) %>%
+        filter(DATUM <= Sys.Date())
       
       if (!is.null(account_data)) { # Only add to finanzkonto if the data is not NULL
         finanzkonto[[ID]] <- list(
@@ -58,5 +63,4 @@ listread_DATA <- function(datapath = DATAPATH, filter_typID = FINANZKONTEN_ID) {
   }
   
   return(finanzkonto)
-
 }

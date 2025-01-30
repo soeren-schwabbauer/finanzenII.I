@@ -3,6 +3,7 @@ rm(list = ls())
 
 # for shiny
 library(shiny)
+library(shinyjs)
 library(bslib)
 library(shinyWidgets)
 
@@ -10,6 +11,7 @@ library(shinyWidgets)
 library(stringr)
 library(magrittr)
 library(tidyr)
+library(purrr)
 library(readr)
 library(scales)
 library(lubridate)
@@ -31,56 +33,38 @@ library(jsonlite)
 
 library(dplyr)
 
-# function to overwrite data with comments
-source("./functions/overwrite_DATA.R")
-# function to read data into list
-source("./functions/listread_DATA.R")
 
-# define global variabales
-DATAPATH <<- "./DATA/"
-FINANZKONTEN_ID <<- list.files(DATAPATH)[!str_detect(list.files(DATAPATH), "gruppen.csv")] # used in listread_DATA to get all files
+# Read Manual Data =============================================================
+
+source("./functions/read_MANUALDATA.R")
+
+MANUALDATA <- read_MANUALDATA("./MANUALDATA/")
+
+# update historicalDATA ========================================================
+
+source("./functions/update_historicalDATA.R")
+
+update_historicalDATA(datapath = "./historicalDATA/")
+
+# read historicalDATA ==========================================================
+
+source("./functions/read_historicalDATA.R")
+historicalDATA <- read_historicalDATA(datapath = "./historicalDATA/")
+
+# create Auto Data =============================================================
+
+source("./functions/create_PORTFOLIODATA.R")
+PORTFOLIODATA <- create_PORTFOLIODATA(manualdata = MANUALDATA, historicaldata = historicalDATA)
 
 
 ################################################################################
 # load modules for shiny app ###################################################
 source("./finanzkonten_mod.R")
 source("./girokonten_mod.R")
-source("./depots_mod.R")
-source("./wallets_mod.R")
+#source("./depots_mod.R")
+#source("./wallets_mod.R")
+#source("./entnahme_mod.R")
 source("./upload_mod.R")
-
-
-################################################################################
-# LIVE DATA ####################################################################
-
-# scrape API data & load into csv DATA -----------------------------------------
-source("./functions/live_BIPGATWWXXX.R")
-
-# update live prices for depots ------------------------------------------------
-source("./functions/live_depots_prices.R")
-
-
-################################################################################
-# LOAD DATA ####################################################################
-
-# from static csv files --------------------------------------------------------
-
-finanzkonto <- listread_DATA(DATAPATH)
-girokonten  <- listread_DATA(DATAPATH, filter_typID = c("GIR", "EXT", "GTH"))
-depots      <- listread_DATA(DATAPATH, filter_typID = "DEP")
-wallets     <- listread_DATA(DATAPATH, filter_typID = "WAL") 
-
-
-
-
-
-# create dataframe with IDs ---------------------------------------------------- 
-
-bank_konto <- lapply(finanzkonto, function(x) {
-  data.frame(bank = x$bank, konto = x$konto, display_name = x$display_name, ID = x$name)
-})
-
-bank_konto <- bind_rows(bank_konto) 
 
 
 ################################################################################
@@ -88,11 +72,9 @@ bank_konto <- bind_rows(bank_konto)
 
 ui <- page_fluid(
   tabsetPanel(
-    tabPanel("Übersicht", uebersichtUI("uebersicht", finanzkonto, bank_konto)),
-    tabPanel("Girokonten", girokontenUI("girokonten", girokonten)),
-    tabPanel("Depots", depotsUI("depots", depots)),
-    tabPanel("Wallets", walletsUI("wallets", wallets)),
-    tabPanel("Upload", uploadUI("upload", finanzkonto))
+    tabPanel("Übersicht", uebersichtUI("uebersicht", MANUALDATA, PORTFOLIODATA)),
+    tabPanel("Girokonten", girokontenUI("girokonten", MANUALDATA)),
+    tabPanel("Upload", uploadUI("upload", MANUALDATA))
   )
 )
 
@@ -103,11 +85,9 @@ ui <- page_fluid(
 # Define the server logic for the main app
 server <- function(input, output, session) {
   
-  uebersichtServer("uebersicht", finanzkonto, bank_konto)
-  girokontenServer("girokonten", girokonten)
-  depotsServer("depots", depots)
-  walletsServer("wallets", wallets)
-  uploadServer("upload", finanzkonto)
+  uebersichtServer("uebersicht", MANUALDATA, PORTFOLIODATA)
+  girokontenServer("girokonten", MANUALDATA)
+  uploadServer("upload", MANUALDATA)
   
 }
 

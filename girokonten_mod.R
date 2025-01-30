@@ -433,7 +433,7 @@ girokontenServer <- function(id, girokonten) {
                                       .default = "Einnahme")))
       
       # load gruppen for matching ------
-      gruppen <- read.csv("./DATA/gruppen.csv")  %>%
+      gruppen <- read.csv(paste0("./MANUALDATA/", "gruppen.csv"))  %>%
         filter(kategorie != "") %>%
         mutate(patterns = tolower(patterns))
       patterns <- gruppen$patterns
