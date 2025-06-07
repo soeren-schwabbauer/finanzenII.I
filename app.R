@@ -5,6 +5,7 @@ rm(list = ls())
 library(shiny)
 library(shinyjs)
 library(bslib)
+library(bsicons)
 library(shinyWidgets)
 
 # dataprep
@@ -24,6 +25,7 @@ library(RColorBrewer)
 library(reactable)
 library(DT)
 library(visNetwork)
+library(plotly)
 
 # for API
 library(rvest)
@@ -36,47 +38,86 @@ library(dplyr)
 
 # Read Manual Data =============================================================
 
-source("./functions/read_MANUALDATA.R")
+source("./functions/readdata_manual.R")
+data_manual <- readdata_maual()
 
-MANUALDATA <- read_MANUALDATA("./MANUALDATA/")
 
-# update historicalDATA ========================================================
+# read Historical Data =========================================================
 
-source("./functions/update_historicalDATA.R")
+# ziel ist aus den Preisen den wert des protfolios/sparbriefs, etc. zu berechnen
+source("./functions/readdata_historical.R")
 
-update_historicalDATA(datapath = "./historicalDATA/")
+data_depot <- readdata_historical(datapath = "./data/depot/")
+data_sparbrief <- readdata_historical(datapath = "./data/sparbrief/")
+data_wallet <- readdata_historical(datapath = "./data/wallet/")
 
-# read historicalDATA ==========================================================
+data_historical <- list(depot = data_depot, sparbrief = data_sparbrief, wallet = data_wallet)
 
-source("./functions/read_historicalDATA.R")
-historicalDATA <- read_historicalDATA(datapath = "./historicalDATA/")
+source("./functions/createdata_portfolio.R")
+data_portfolio <- createdata_portfolio(manualdata = data_manual, historicaldata = data_historical)
 
-# create Auto Data =============================================================
 
-source("./functions/create_PORTFOLIODATA.R")
-PORTFOLIODATA <- create_PORTFOLIODATA(manualdata = MANUALDATA, historicaldata = historicalDATA)
 
+INFLATIONDATA <- read.csv("./data/inflation.csv")
+INFLATIONDATA$datum <- as.Date(paste0("01-", gsub("\\.", "", INFLATIONDATA$datum)), format = "%d-%b%y")
 
 ################################################################################
 # load modules for shiny app ###################################################
-source("./finanzkonten_mod.R")
-source("./girokonten_mod.R")
-#source("./depots_mod.R")
-#source("./wallets_mod.R")
-#source("./entnahme_mod.R")
-source("./upload_mod.R")
+source("./uebersicht_mod.R")
+source("./giro_mod.R")
+source("./depot_mod.R")
+source("./konten_mod.R")
+source("./wallet_mod.R")
+source("./gruppen_mod.R")
 
 
 ################################################################################
 # UI ###########################################################################
 
-ui <- page_fluid(
-  tabsetPanel(
-    tabPanel("Übersicht", uebersichtUI("uebersicht", MANUALDATA, PORTFOLIODATA)),
-    tabPanel("Girokonten", girokontenUI("girokonten", MANUALDATA)),
-    tabPanel("Upload", uploadUI("upload", MANUALDATA))
+ui <- page_navbar(
+  title = "Finanzen",
+  # ⬇️ HEAD-Inhalte gehören hier rein
+  header = tags$head(
+    includeCSS("www/card-reveal-full-screen.css")
+  ),
+  
+  # ⬇️ Das hier sind gültige Navigations-Panels
+  nav_panel(
+    title = "Übersicht",
+    uebersichtUI("uebersicht", data_manual, data_portfolio)
+  ),
+  nav_panel(
+    title = "Giro",
+    giroUI("giro", data_manual)
+  ),
+  nav_panel(
+    title = "Depot",
+    depotUI("depot", data_portfolio)
+  ),
+  nav_panel(
+    title = "Wallet",
+    walletUI("wallet", data_portfolio)
+  ),
+  nav_panel(
+    title = "Daten",
+    fluidRow(
+      column(width = 12,
+             kontenUI("konten", data_manual)
+      ),
+      column(width = 12,
+             gruppenUI("gruppen")
+      )
+    )
+  ),
+  nav_spacer(),
+  nav_menu(
+    title = "Links",
+    align = "right",
+    nav_item("x"),
+    nav_item("y")
   )
 )
+
 
 
 
@@ -85,10 +126,13 @@ ui <- page_fluid(
 # Define the server logic for the main app
 server <- function(input, output, session) {
   
-  uebersichtServer("uebersicht", MANUALDATA, PORTFOLIODATA)
-  girokontenServer("girokonten", MANUALDATA)
-  uploadServer("upload", MANUALDATA)
-  
+  uebersichtServer("uebersicht", data_manual, data_portfolio, INFLATIONDATA)
+  giroServer("giro", data_manual)
+  depotServer("depot", data_portfolio)
+  walletServer("wallet", data_portfolio)
+  kontenServer("konten", data_manual)
+  gruppenServer("gruppen")
+
 }
 
 

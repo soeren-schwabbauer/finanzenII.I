@@ -1,55 +1,56 @@
 
-create_PORTFOLIODATA <- function(manualdata, historicaldata) {
+createdata_portfolio <- function(manualdata, historicaldata) {
   
   message("... creating PORTFOLIODATA")
+  historicaldata <- bind_rows(historicaldata)
   
   data <- 
     
     data.frame(bind_rows(manualdata)$data) %>%
     
-    mutate(name = GEGENSEITE) %>%
-    select(name, DATUM, VERWENDUNGSZWECK, BETRAG) %>%
+    mutate(name = gegenseite) %>%
+    select(name, datum, verwendungszweck, betrag) %>%
     # filter wertpapierkäufe/cryptokäufe
-    filter(str_detect("WERTPAPIERHANDEL|CRYPTOHANDEL", VERWENDUNGSZWECK)) %>%
+    filter(str_detect("ETFHANDEL|AKTIENHANDEL|CRYPTOHANDEL|SPARBRIEFHANDEL", verwendungszweck)) %>%
     
-    separate_wider_delim(VERWENDUNGSZWECK, delim = "|", names = c("kaufart", "ID", "ANZAHL")) %>%
-    
+    separate_wider_delim(verwendungszweck, delim = "|", names = c("form", "id", "anzahl")) %>%
+    mutate(form = gsub("HANDEL", "", form)) %>%
     # format variables
-    mutate(BETRAG = -BETRAG) %>%
+    mutate(betrag = -betrag) %>%
     
     # get cumulated number & plain saldo (without rendite)
-    arrange(DATUM) %>%
-    group_by(name, ID) %>%
-    mutate(ANZAHL = cumsum(ANZAHL),
-           SALDO_raw = cumsum(BETRAG)) %>%
+    arrange(datum) %>%
+    group_by(name, id) %>%
+    mutate(anzahl = cumsum(anzahl),
+           saldo_raw = cumsum(betrag)) %>%
     ungroup() %>%
-    select(name, DATUM, ID, ANZAHL, SALDO_raw)
+    select(name, form, datum, id, anzahl, saldo_raw)
   
   
   data_ts <-
     
-    expand.grid(ID = unique(data$ID),
+    expand.grid(id = unique(data$id),
                 name = unique(data$name),
-                DATUM = seq.Date(from = as.Date("2021-11-01"),
+                datum = seq.Date(from = as.Date("2021-11-01"),
                                  to = Sys.Date(),
                                  by = "day")) %>%
-    arrange(ID, name, DATUM) %>%
+    arrange(id, name, datum) %>%
     
-    # add opening price for each ID
-    left_join(historicaldata, by = c("ID", "DATUM")) %>%
+    # add opening price for each id
+    left_join(historicaldata, by = c("id", "datum")) %>%
     
     # add info on purchases
-    left_join(data, by = c("DATUM", "ID", "name")) %>%
+    left_join(data, by = c("datum", "id", "name")) %>%
     
     # assign each saldo
-    group_by(name, ID) %>%
-    fill(ANZAHL, SALDO_raw, .direction = "down") %>%
+    group_by(name, id) %>%
+    fill(anzahl, saldo_raw, form, .direction = "down") %>%
     ungroup() %>%
     # filter NAs for performance
-    filter(!is.na(ANZAHL)) %>%
+    filter(!is.na(anzahl)) %>%
     
     # saldo mit rendite
-    mutate(SALDO_rendite = ANZAHL * openingprice) 
+    mutate(saldo_rendite = anzahl * preis) 
     
   
   data_list <- split(data_ts, list(data_ts$name)) 
@@ -60,12 +61,17 @@ create_PORTFOLIODATA <- function(manualdata, historicaldata) {
     df <- as.data.frame(df)  # Convert tibble to data.frame
     name = unique(df$name)
 
+    # HARDCODE für angezeigte names
     if(name == "BIPGATWWXXX_WAL") {
       display_name = "BITPANDA - WALLET"
     } else if(name == "INGDDEFFXXX_DEP") {
       display_name = "ING - DEPOT"
     } else if(name == "BIWBDE33XXX_DEP") {
       display_name = "FLATEX - DEPOT"
+    } else if(name == "INGDDEFFXXX_SPB"){
+      display_name = "ING - SPARBRIEF"
+    } else if(name == "TRBKDEBBXXX_DEP") {
+      display_name = "TRADEREPUBLIC - DEPOT"
     }
     
     konto = gsub(".* ", "", display_name)
