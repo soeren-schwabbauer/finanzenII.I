@@ -121,25 +121,25 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
                                manualdata_unlist$data) 
       
       data_basekonten <- basekonten %>%
-        select(DATUM, display_name, SALDO) %>%
-        mutate(DATUM = as.Date(DATUM)) %>%
+        select(datum, display_name, saldo) %>%
+        mutate(datum = as.Date(datum)) %>%
         # doppelte salden vermeiden
-        group_by(DATUM, display_name) %>%
+        group_by(datum, display_name) %>%
         # bisher von nach absteigendem datum sortiert
         slice(1) %>% #-> erstes saldo behalten (das letzte eingetragene saldo des tages)
         ungroup() %>%
-        arrange(display_name, DATUM) 
+        arrange(display_name, datum) 
       
       grid_basekonten <- 
         # empty grid for timeserie in depots
         expand.grid(display_name = unique(data_basekonten$display_name),
-                    DATUM = seq.Date(from = as.Date("2020-01-01"),
+                    datum = seq.Date(from = as.Date("2020-01-01"),
                                      to = Sys.Date(),
                                      by = "day")) %>%
-        arrange(display_name, DATUM) %>%
-        left_join(data_basekonten, by = c("display_name", "DATUM")) %>%
+        arrange(display_name, datum) %>%
+        left_join(data_basekonten, by = c("display_name", "datum")) %>%
         group_by(display_name) %>%
-        fill(SALDO, .direction = "down") %>%
+        fill(saldo, .direction = "down") %>%
         ungroup()
       
       # PORTFOLIOS to GRID ===================================================
@@ -149,44 +149,44 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
                               portfolio_unlist$data)
       
       data_portfolio <- portfolio %>% 
-        mutate(SALDO = if(input$incl_redite) SALDO_rendite else SALDO_raw)
+        mutate(saldo = if(input$incl_redite) saldo_rendite else saldo_raw)
       
       grid_portfolio <- 
         expand.grid(display_name = unique(data_portfolio$display_name),
-                    DATUM = seq.Date(from = as.Date("2020-01-01"),
+                    datum = seq.Date(from = as.Date("2020-01-01"),
                                      to = Sys.Date(),
                                      by = "day")) %>%
-        arrange(display_name, DATUM) %>%
-        left_join(data_portfolio, by = c("display_name", "DATUM"))
+        arrange(display_name, datum) %>%
+        left_join(data_portfolio, by = c("display_name", "datum"))
       
       # alle konten verbinden ==================================================
       grid_full <- bind_rows(grid_basekonten, grid_portfolio) %>%
-        mutate(SALDO = ifelse(is.na(SALDO), 0, SALDO))
+        mutate(saldo = ifelse(is.na(saldo), 0, saldo))
       
       # datum filtern
       full <- grid_full %>% 
-        filter(DATUM >= input$filter_daterange[1],
-               DATUM <= input$filter_daterange[2])
+        filter(datum >= input$filter_daterange[1],
+               datum <= input$filter_daterange[2])
       
       # kontosaldo nach groupingvariable aufsummieren ------------------------
       if (input$grouping_var == "insgesammt") {
         full <- full %>%
-          group_by(DATUM) %>%
-          summarise(SALDO = sum(SALDO), .groups = "drop") %>%
+          group_by(datum) %>%
+          summarise(saldo = sum(saldo), .groups = "drop") %>%
           mutate(grouped_var = "Total")
       } else {
         full <- full %>%
           mutate(konto = gsub(".* - ", "", display_name),
                  bank =  gsub(" - .*", "", display_name)) %>%
-          group_by(DATUM, grouped_var = !!sym(input$grouping_var)) %>%
-          summarise(SALDO = sum(SALDO), .groups = "drop")
+          group_by(datum, grouped_var = !!sym(input$grouping_var)) %>%
+          summarise(saldo = sum(saldo), .groups = "drop")
       }
       
       # inflation bereinigen ===================================================
       
       if(isTRUE(input$incl_inflation)) {
         
-        full <- full %>% mutate(monat = floor_date(DATUM, unit = "month"))
+        full <- full %>% mutate(monat = floor_date(datum, unit = "month"))
         
         # 2. VPI-Basis definieren (z.B. Januar 2020)
         basis_datum <- min(full$monat)
@@ -197,7 +197,7 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
           tidyr::fill(preis, .direction = "down")  # oder 'updown' für beidseitig
         
         # 4. Realsaldo berechnen
-        full <- full %>% mutate(SALDO = SALDO * (vpi_basis / preis))
+        full <- full %>% mutate(saldo = saldo * (vpi_basis / preis))
         
       }
       
@@ -231,16 +231,16 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
       full <- data_fullts() %>% 
         filter(grouped_var %in% input$subset_var) %>%
         mutate(
-          DATUM_TS = datetime_to_timestamp(as.POSIXct(DATUM))
+          datum_TS = datetime_to_timestamp(as.POSIXct(datum))
         )
       
       # Prozent pro Tag berechnen
       if (input$display_values == "prozent") {
         full <- full %>%
-          group_by(DATUM_TS) %>%
-          mutate(total = sum(SALDO)) %>%
+          group_by(datum_TS) %>%
+          mutate(total = sum(saldo)) %>%
           ungroup() %>%
-          mutate(SALDO = round(SALDO / total, 4) * 100)
+          mutate(saldo = round(saldo / total, 4) * 100)
         sign_tooltip <- "%"
       } else {
         sign_tooltip <- "€"
@@ -248,8 +248,8 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
       
       # Total sum für schwarze Linie
       sum_data <- full %>%
-        group_by(DATUM_TS) %>%
-        summarize(SALDO_SUM = sum(SALDO), .groups = "drop")
+        group_by(datum_TS) %>%
+        summarize(saldo_sum = sum(saldo), .groups = "drop")
       
       # Highchart
       highchart() %>%
@@ -259,7 +259,7 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
           full %>%
             group_by(grouped_var) %>%
             summarize(
-              data = list(map2(DATUM_TS, SALDO, ~ list(x = .x, y = .y))),
+              data = list(map2(datum_TS, saldo, ~ list(x = .x, y = .y))),
               .groups = "drop"
             ) %>%
             mutate(series = map2(
@@ -274,7 +274,7 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
         ) %>%
         hc_add_series(
           name = "Total Sum",
-          data = map2(sum_data$DATUM_TS, sum_data$SALDO_SUM, ~ list(x = .x, y = .y)),
+          data = map2(sum_data$datum_TS, sum_data$saldo_sum, ~ list(x = .x, y = .y)),
           type = "line",
           color = "black"
         ) %>%
@@ -317,8 +317,8 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
     full_agg <- reactive({
       
       data_fullts() %>%
-        group_by(DATUM) %>%
-        summarize(SALDO_SUM = sum(SALDO)) %>%
+        group_by(datum) %>%
+        summarize(saldo_sum = sum(saldo)) %>%
         ungroup()
       
     })
@@ -327,13 +327,13 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
     output$roadto100k <- renderText({
       
       avg_per_day <- full_agg() %>%
-        mutate(diff = SALDO_SUM - lag(SALDO_SUM)) %>%
+        mutate(diff = saldo_sum - lag(saldo_sum)) %>%
         summarise(mean = mean(diff, na.rm = TRUE)) %>%
         pull()
       
-      diffdays <- as.numeric(max(full_agg()$DATUM) - min(full_agg()$DATUM))
+      diffdays <- as.numeric(max(full_agg()$datum) - min(full_agg()$datum))
       
-      total_heute <- full_agg() %>% filter(DATUM == max(DATUM)) %>% pull(SALDO_SUM)
+      total_heute <- full_agg() %>% filter(datum == max(datum)) %>% pull(saldo_sum)
       
       days <- round((100000 - total_heute) / avg_per_day,0)
       
@@ -344,7 +344,7 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
     
     output$totalsaldo <- renderText({
       
-      info <- full_agg() %>% filter(DATUM == max(DATUM)) %>% pull(SALDO_SUM)
+      info <- full_agg() %>% filter(datum == max(datum)) %>% pull(saldo_sum)
       info <- comma(info, suffix = "€", big.mark = ".", decimal.mark = ",")
       
       return(info)
@@ -354,7 +354,7 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
     output$saldoentwicklung <- renderText({
       
       data <- full_agg()
-      info <- slice(data, c(1, nrow(data))) %>% pull(SALDO_SUM) %>% diff()
+      info <- slice(data, c(1, nrow(data))) %>% pull(saldo_sum) %>% diff()
       info <- comma(info, suffix = "€", big.mark = ".", decimal.mark = ",")
       
       return(info)
@@ -370,12 +370,12 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
       
       # Funktion zur Prognose
       berechne_prognosedatum <- function(daten_bis_jetzt, zielwert) {
-        tage <- as.numeric(daten_bis_jetzt$DATUM - min(daten_bis_jetzt$DATUM))
-        saldo <- daten_bis_jetzt$SALDO_SUM
+        tage <- as.numeric(daten_bis_jetzt$datum - min(daten_bis_jetzt$datum))
+        saldo <- daten_bis_jetzt$saldo_sum
         
         modell <- lm(saldo ~ tage)
         prognose_tag <- (zielwert - coef(modell)[1]) / coef(modell)[2]
-        prognose_datum <- min(daten_bis_jetzt$DATUM) + round(prognose_tag)
+        prognose_datum <- min(daten_bis_jetzt$datum) + round(prognose_tag)
         
         return(prognose_datum)
       }
@@ -390,12 +390,12 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
       })
       
       # Daten mit Prognosedatum erweitern
-      data$PROGNOSE_DATUM <- as.Date(prognosen, origin = "1970-01-01")
+      data$PROGNOSE_datum <- as.Date(prognosen, origin = "1970-01-01")
       
       # Gefilterter Datensatz für Darstellung
       plot_data <- data %>%
-        filter(!is.na(PROGNOSE_DATUM)) %>%
-        filter(DATUM >= input$filter_daterange[1] + 30)
+        filter(!is.na(PROGNOSE_datum)) %>%
+        filter(datum >= input$filter_daterange[1] + 30)
       
       # highcharter Plot
       highchart() %>%
@@ -404,8 +404,8 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
         hc_add_series(
           data = list_parse2(
             data.frame(
-              x = datetime_to_timestamp(plot_data$DATUM),
-              y = datetime_to_timestamp(plot_data$PROGNOSE_DATUM)
+              x = datetime_to_timestamp(plot_data$datum),
+              y = datetime_to_timestamp(plot_data$PROGNOSE_datum)
             )
           ),
           type = "line",

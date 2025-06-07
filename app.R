@@ -38,28 +38,27 @@ library(dplyr)
 
 # Read Manual Data =============================================================
 
-source("./functions/read_MANUALDATA.R")
-MANUALDATA <- read_MANUALDATA()
+source("./functions/readdata_manual.R")
+data_manual <- readdata_maual()
 
 
-# update historicalDATA ========================================================
+# read Historical Data =========================================================
 
-source("./functions/update_historicalDATA.R")
-update_historicalDATA(datapath = "./historicalDATA/")
+# ziel ist aus den Preisen den wert des protfolios/sparbriefs, etc. zu berechnen
+source("./functions/readdata_historical.R")
+
+data_depot <- readdata_historical(datapath = "./data/depot/")
+data_sparbrief <- readdata_historical(datapath = "./data/sparbrief/")
+data_wallet <- readdata_historical(datapath = "./data/wallet/")
+
+data_historical <- list(depot = data_depot, sparbrief = data_sparbrief, wallet = data_wallet)
+
+source("./functions/createdata_portfolio.R")
+data_portfolio <- createdata_portfolio(manualdata = data_manual, historicaldata = data_historical)
 
 
-# read historicalDATA ==========================================================
 
-source("./functions/read_historicalDATA.R")
-historicalDATA <- read_historicalDATA(datapath = "./historicalDATA/")
-
-
-# create Auto Data =============================================================
-
-source("./functions/create_PORTFOLIODATA.R")
-PORTFOLIODATA <- create_PORTFOLIODATA(manualdata = MANUALDATA, historicaldata = historicalDATA)
-
-INFLATIONDATA <- read.csv("./inflation.csv")
+INFLATIONDATA <- read.csv("./data/inflation.csv")
 INFLATIONDATA$datum <- as.Date(paste0("01-", gsub("\\.", "", INFLATIONDATA$datum)), format = "%d-%b%y")
 
 ################################################################################
@@ -85,25 +84,25 @@ ui <- page_navbar(
   # ⬇️ Das hier sind gültige Navigations-Panels
   nav_panel(
     title = "Übersicht",
-    uebersichtUI("uebersicht", MANUALDATA, PORTFOLIODATA)
+    uebersichtUI("uebersicht", data_manual, data_portfolio)
   ),
   nav_panel(
     title = "Giro",
-    giroUI("giro", MANUALDATA)
+    giroUI("giro", data_manual)
   ),
   nav_panel(
     title = "Depot",
-    depotUI("depot", PORTFOLIODATA)
+    depotUI("depot", data_portfolio)
   ),
   nav_panel(
     title = "Wallet",
-    walletUI("wallet", PORTFOLIODATA)
+    walletUI("wallet", data_portfolio)
   ),
   nav_panel(
     title = "Daten",
     fluidRow(
       column(width = 12,
-             kontenUI("konten", MANUALDATA)
+             kontenUI("konten", data_manual)
       ),
       column(width = 12,
              gruppenUI("gruppen")
@@ -127,11 +126,11 @@ ui <- page_navbar(
 # Define the server logic for the main app
 server <- function(input, output, session) {
   
-  uebersichtServer("uebersicht", MANUALDATA, PORTFOLIODATA, INFLATIONDATA)
-  giroServer("giro", MANUALDATA)
-  depotServer("depot", PORTFOLIODATA)
-  walletServer("wallet", PORTFOLIODATA)
-  kontenServer("konten", MANUALDATA)
+  uebersichtServer("uebersicht", data_manual, data_portfolio, INFLATIONDATA)
+  giroServer("giro", data_manual)
+  depotServer("depot", data_portfolio)
+  walletServer("wallet", data_portfolio)
+  kontenServer("konten", data_manual)
   gruppenServer("gruppen")
 
 }

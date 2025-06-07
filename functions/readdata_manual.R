@@ -2,7 +2,7 @@
 # each list is a konto, containing the data and a header
 
 # filter_typID is _* ID in name of csv file
-read_MANUALDATA <- function(datapath = "./MANUALDATA/", konto = NULL) {
+readdata_maual <- function(datapath = "./data/manual/", konto = NULL) {
 
   message("... loading MANUALDATA")
   
@@ -40,8 +40,8 @@ read_MANUALDATA <- function(datapath = "./MANUALDATA/", konto = NULL) {
     tryCatch({
       # Load the data for the current ID
       account_data <- load_finanzkonten(finanzkonto_file = i) %>%
-        mutate(DATUM = as.Date(DATUM)) %>%
-        filter(DATUM <= Sys.Date())
+        mutate(datum = as.Date(datum)) %>%
+        filter(datum <= Sys.Date())
       
       if (!is.null(account_data)) { # Only add to finanzkonto if the data is not NULL
         finanzkonto[[ID]] <- list(

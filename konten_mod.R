@@ -4,7 +4,7 @@ kontenUI <- function(id, finanzkonto) {
   accordion_panels <- lapply(finanzkonto, function(account) {
     account_id <- account$name
     bank <- account$bank
-    saldo <- format(account$data$SALDO[1], big.mark = ".", decimal.mark = ",")
+    saldo <- format(account$data$saldo[1], big.mark = ".", decimal.mark = ",")
     
     accordion_panel(
       title = paste0(account$display_name, " | ", saldo, "€"),
@@ -94,14 +94,14 @@ kontenServer <- function(id, finanzkonto) {
           selectizeInput(
             ns("new_Gegenseite"),
             "Gegenseite",
-            choices = unique(df$GEGENSEITE),
+            choices = unique(df$gegenseite),
             selected = "",
             options = list(create = TRUE)
           ),
           selectizeInput(
             ns("new_Verwendungszweck"),
             "Verwendungszweck",
-            choices = unique(na.omit(df$VERWENDUNGSZWECK)),
+            choices = unique(na.omit(df$verwendungszweck)),
             selected = "",
             options = list(create = TRUE)
           ),
@@ -120,8 +120,8 @@ kontenServer <- function(id, finanzkonto) {
         removeModal()
         df <- data_reactive[[account_id]]
         
-        vorheriger_saldo <- if (nrow(df) >= 1 && "SALDO" %in% names(df)) {
-          suppressWarnings(as.numeric(df[1, "SALDO"]))
+        vorheriger_saldo <- if (nrow(df) >= 1 && "saldo" %in% names(df)) {
+          suppressWarnings(as.numeric(df[1, "saldo"]))
         } else {
           0
         }
@@ -130,12 +130,12 @@ kontenServer <- function(id, finanzkonto) {
         neuer_saldo <- vorheriger_saldo + neuer_betrag
         
         new_row <- data.frame(
-          DATUM = as.Date(input$new_Datum),
-          GEGENSEITE = input$new_Gegenseite,
-          VERWENDUNGSZWECK = input$new_Verwendungszweck,
-          BETRAG = neuer_betrag,
-          BETRAG_EDITED = input$new_Betrag_edited,
-          SALDO = neuer_saldo,
+          datum = as.Date(input$new_Datum),
+          gegenseite = input$new_Gegenseite,
+          verwendungszweck = input$new_Verwendungszweck,
+          betrag = neuer_betrag,
+          betrag_edited = input$new_Betrag_edited,
+          saldo = neuer_saldo,
           stringsAsFactors = FALSE
         )
         

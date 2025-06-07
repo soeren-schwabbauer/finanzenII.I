@@ -1,34 +1,37 @@
 
 # einlesen =====================================================================
 
-read_historicalDATA <- function(datapath) {
+readdata_historical <- function(datapath) {
 
-  message("... reading historicalDATA")
+  
+  message("... reading ", datapath)
   
   files <- list.files(datapath, full.names = TRUE)
+  files <- files[files != paste0(datapath, "/_info.txt")]
   historicaldata <- list()
   
   for(i in files) {
     
     filename <- gsub(".*\\/\\/", "", i)
-    ID <- gsub("_.*", "", filename)
+    id <- gsub("_.*", "", filename)
+    id <- gsub("\\..*", "", filename)
     
      data <- read.csv(i) %>%
       
-      mutate(DATUM = as.Date(DATUM),
-             price = as.numeric(price),
-             ID = ID) %>%
-      arrange(DATUM) 
+      mutate(datum = as.Date(datum),
+             preis = as.numeric(preis),
+             id = id) %>%
+      arrange(datum) 
     
      # every date needs a closingprice
-    historicaldata[[ID]] <- 
+    historicaldata[[id]] <- 
       
-      data.frame(DATUM = seq.Date(from = min(data$DATUM),
+      data.frame(datum = seq.Date(from = min(data$datum),
                                  to   = Sys.Date(),
                                  by   = "day")) %>%
       
-      left_join(data, by = "DATUM") %>%
-      fill(price, ID, .direction = "down")
+      left_join(data, by = "datum") %>%
+      fill(preis, id, .direction = "down")
   }
   
   # all historical data

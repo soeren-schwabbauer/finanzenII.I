@@ -3,7 +3,7 @@
 # Verwendet bisher nur Girokonten von ING und Trade republik.
 # Idealerweise aufzeigen, wie viel in Sparplan geht und wie viel zu Flatex geht.
 
-# Verwendet BETRAG_EDITED . Diese Variable kombiniert etwa Rückzahlungen aus dem 
+# Verwendet betrag_edited . Diese Variable kombiniert etwa Rückzahlungen aus dem 
 # Onlineshopping, 
 
 # ==============================================================================
@@ -18,7 +18,7 @@ nettobilanz <- function(info) {
   # aggregate data ---------------------
   plot_data <- data %>%
     group_by(year_month) %>%
-    summarise(sum = sum(BETRAG_EDITED, na.rm = TRUE), .groups = "drop") %>%
+    summarise(sum = sum(betrag_edited, na.rm = TRUE), .groups = "drop") %>%
     ungroup() %>%
     mutate(typ = case_when(sum < 0 ~ "Defizit", .default = "Überschuss")) %>%
     mutate(kategorie = "") 
@@ -70,16 +70,16 @@ verlauf <- function(info) {
     sum_einnahmen_monthly <- data %>% 
       filter(typ == "Einnahme") %>%
       group_by(year_month) %>%
-      summarise(sum_einnahmen_month = sum(BETRAG_EDITED))
+      summarise(sum_einnahmen_month = sum(betrag_edited))
   }
   
   # subset nach einnahmen & ausgaben
-  if(info$art == "Einnahmen") plot_data <- data %>% filter(BETRAG_EDITED > 0) 
-  if(info$art %in% c("Ausgaben", "Verhältnis")) plot_data <- data %>% filter(BETRAG_EDITED < 0)
+  if(info$art == "Einnahmen") plot_data <- data %>% filter(betrag_edited > 0) 
+  if(info$art %in% c("Ausgaben", "Verhältnis")) plot_data <- data %>% filter(betrag_edited < 0)
   
   plot_data %<>%
     group_by(year_month, kategorie = as.character(kategorie)) %>%
-    summarise(sum = abs(sum(BETRAG_EDITED, na.rm = TRUE)), .groups = "drop") %>%
+    summarise(sum = abs(sum(betrag_edited, na.rm = TRUE)), .groups = "drop") %>%
     complete(year_month, kategorie, fill = list(sum = 0)) %>%  
     mutate(year_month = as.character(year_month))
   
@@ -172,9 +172,9 @@ sankey <- function(info) {
   
   # Step 1: Prepare the data for income flows
   income_flows <- data %>%
-    filter(BETRAG_EDITED > 0) %>%
+    filter(betrag_edited > 0) %>%
     group_by(from = name, to = kategorie) %>%
-    summarise(weight = sum(BETRAG_EDITED), .groups = 'drop') %>%
+    summarise(weight = sum(betrag_edited), .groups = 'drop') %>%
     # For ordering largest group to smallest
     ungroup() %>%
     group_by(to) %>%
@@ -184,9 +184,9 @@ sankey <- function(info) {
   
   # Step 3: Aggregate income by category
   income_aggregation <- data %>%
-    filter(BETRAG_EDITED > 0) %>%
+    filter(betrag_edited > 0) %>%
     group_by(from = kategorie) %>%
-    summarise(weight = sum(BETRAG_EDITED), .groups = 'drop') %>%
+    summarise(weight = sum(betrag_edited), .groups = 'drop') %>%
     ungroup() %>%
     mutate(to = "Einkommen", .after = from) %>%
     # Order
@@ -194,9 +194,9 @@ sankey <- function(info) {
   
   # Step 4: Aggregate expenses by category
   expense_aggregation <- data %>%
-    filter(BETRAG_EDITED < 0) %>%
+    filter(betrag_edited < 0) %>%
     group_by(to = kategorie) %>%
-    summarise(weight = sum(-BETRAG_EDITED), .groups = 'drop') %>%
+    summarise(weight = sum(-betrag_edited), .groups = 'drop') %>%
     ungroup() %>%
     mutate(from = "Ausgaben", .before = to) %>% # Aggregate to a single "Ausgaben" node
     # Arrange
@@ -253,11 +253,11 @@ tabelle <- function(info) {
   data <- info$data
   
   data %>%
-    select(all_of(info$auswahl), DATUM, GEGENSEITE, VERWENDUNGSZWECK, BETRAG_EDITED) %>%
+    select(all_of(info$auswahl), datum, gegenseite, verwendungszweck, betrag_edited) %>%
     reactable(
       groupBy = c(info$auswahl),
       columns = list(
-        BETRAG_EDITED = colDef(aggregate = "sum", format = colFormat(currency = "EUR"))
+        betrag_edited = colDef(aggregate = "sum", format = colFormat(currency = "EUR"))
       )
     )
 }
@@ -373,16 +373,15 @@ giroUI <- function(id, girokonten) {
 giroServer <- function(id, girokonten) {
   moduleServer(id, function(input, output, session) {
     
-    load_gruppen <- function() read.csv(paste0("./MANUALDATA/", "gruppen.csv"))
+    load_gruppen <- function() read.csv(paste0("./data/manual/", "gruppen.csv"))
                                         
-    girokonten_rv <- reactiveVal(read_MANUALDATA())
+    girokonten_rv <- reactiveVal(readdata_maual())
     gruppen_rv <- reactiveVal(load_gruppen())
     
     observeEvent(input$refresh_data, {
-      new_data <- read_MANUALDATA()
+      new_data <- readdata_maual()
       girokonten_rv(new_data)
       
-      new_gruppen <- load_gruppen()
       gruppen_rv(new_gruppen)
     })
     
@@ -393,22 +392,22 @@ giroServer <- function(id, girokonten) {
       # Girokonten sind konten mit GIR oder GTH im Namen
       GIR <- bind_rows(lapply(girokonten_rv(), function(list) list[["data"]])) %>%
         
-        mutate(DATUM = as.Date(DATUM)) %>%
+        mutate(datum = as.Date(datum)) %>%
         # filter date aus auswahl - zuerst, um speed zu erhöhen für join der kategorien
-        filter(DATUM >= input$filter_date[1] & DATUM <= input$filter_date[2])  %>%
+        filter(datum >= input$filter_date[1] & datum <= input$filter_date[2])  %>%
         
         # eigene Konten ausschließen
-        filter(!str_detect(GEGENSEITE, "_GIR"),
-               !str_detect(GEGENSEITE, "_GTH"),
-               !str_detect(GEGENSEITE, "_EXT")) %>%
-        filter(BETRAG_EDITED != 0) %>%
+        filter(!str_detect(gegenseite, "_GIR"),
+               !str_detect(gegenseite, "_GTH"),
+               !str_detect(gegenseite, "_EXT")) %>%
+        filter(betrag_edited != 0) %>%
         
-        mutate(monat_jahr = format(DATUM, "%Y-%m")) %>%
+        mutate(monat_jahr = format(datum, "%Y-%m")) %>%
         
-        mutate(year = format(DATUM, "%Y")) %>%
-        mutate(year_month = format(DATUM, "%Y-%m")) %>%
+        mutate(year = format(datum, "%Y")) %>%
+        mutate(year_month = format(datum, "%Y-%m")) %>%
         # eigene klasse für aktien, damit nicht angezeit wird, in einnahmen, bzw ausgaben, aber in 
-        mutate(typ = factor(case_when(BETRAG_EDITED < 0 ~ "Ausgabe", 
+        mutate(typ = factor(case_when(betrag_edited < 0 ~ "Ausgabe", 
                                       .default = "Einnahme")))
       
       # load gruppen for matching ------
@@ -421,8 +420,8 @@ giroServer <- function(id, girokonten) {
       GIR %<>% 
         rowwise() %>%
         mutate(
-          lower_gegenseite = tolower(GEGENSEITE),
-          lower_verwendungszweck = tolower(VERWENDUNGSZWECK),
+          lower_gegenseite = tolower(gegenseite),
+          lower_verwendungszweck = tolower(verwendungszweck),
           patterns = case_when(
             nchar(lower_gegenseite) == 0 & nchar(lower_verwendungszweck) == 0 ~ NA_character_,
             TRUE ~ {
@@ -438,7 +437,7 @@ giroServer <- function(id, girokonten) {
         left_join(gruppen %>% distinct(patterns, kategorie, name), by = "patterns") %>%
         mutate(
           kategorie = ifelse(is.na(kategorie), "sonstige", kategorie),
-          name = ifelse(is.na(name), GEGENSEITE, name)
+          name = ifelse(is.na(name), gegenseite, name)
         ) %>%
         select(-lower_gegenseite, -lower_verwendungszweck, -patterns) %>%
         mutate(kategorie = factor(kategorie),
@@ -450,12 +449,12 @@ giroServer <- function(id, girokonten) {
     
     # Kategorien aus GIR ---------------
     reactive_choices_einnahmen <- reactive({
-      GIR_allekategorien() %>% filter(BETRAG_EDITED > 0) %>%
+      GIR_allekategorien() %>% filter(betrag_edited > 0) %>%
         pull(kategorie) %>% unique()
     })
     
     reactive_choices_ausgaben <- reactive({
-      GIR_allekategorien() %>% filter(BETRAG_EDITED < 0) %>%
+      GIR_allekategorien() %>% filter(betrag_edited < 0) %>%
         pull(kategorie) %>% unique()
     })
     
