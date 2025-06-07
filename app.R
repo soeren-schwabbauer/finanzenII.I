@@ -5,6 +5,7 @@ rm(list = ls())
 library(shiny)
 library(shinyjs)
 library(bslib)
+library(bsicons)
 library(shinyWidgets)
 
 # dataprep
@@ -24,6 +25,7 @@ library(RColorBrewer)
 library(reactable)
 library(DT)
 library(visNetwork)
+library(plotly)
 
 # for API
 library(rvest)
@@ -37,46 +39,86 @@ library(dplyr)
 # Read Manual Data =============================================================
 
 source("./functions/read_MANUALDATA.R")
+MANUALDATA <- read_MANUALDATA()
 
-MANUALDATA <- read_MANUALDATA("./MANUALDATA/")
 
 # update historicalDATA ========================================================
 
 source("./functions/update_historicalDATA.R")
-
 update_historicalDATA(datapath = "./historicalDATA/")
+
 
 # read historicalDATA ==========================================================
 
 source("./functions/read_historicalDATA.R")
 historicalDATA <- read_historicalDATA(datapath = "./historicalDATA/")
 
+
 # create Auto Data =============================================================
 
 source("./functions/create_PORTFOLIODATA.R")
 PORTFOLIODATA <- create_PORTFOLIODATA(manualdata = MANUALDATA, historicaldata = historicalDATA)
 
+INFLATIONDATA <- read.csv("./inflation.csv")
+INFLATIONDATA$datum <- as.Date(paste0("01-", gsub("\\.", "", INFLATIONDATA$datum)), format = "%d-%b%y")
 
 ################################################################################
 # load modules for shiny app ###################################################
-source("./finanzkonten_mod.R")
-source("./girokonten_mod.R")
-#source("./depots_mod.R")
-#source("./wallets_mod.R")
-#source("./entnahme_mod.R")
-source("./upload_mod.R")
+source("./uebersicht_mod.R")
+source("./giro_mod.R")
+source("./depot_mod.R")
+source("./konten_mod.R")
+source("./wallet_mod.R")
+source("./gruppen_mod.R")
 
 
 ################################################################################
 # UI ###########################################################################
 
-ui <- page_fluid(
-  tabsetPanel(
-    tabPanel("Übersicht", uebersichtUI("uebersicht", MANUALDATA, PORTFOLIODATA)),
-    tabPanel("Girokonten", girokontenUI("girokonten", MANUALDATA)),
-    tabPanel("Upload", uploadUI("upload", MANUALDATA))
+ui <- page_navbar(
+  title = "Finanzen",
+  # ⬇️ HEAD-Inhalte gehören hier rein
+  header = tags$head(
+    includeCSS("www/card-reveal-full-screen.css")
+  ),
+  
+  # ⬇️ Das hier sind gültige Navigations-Panels
+  nav_panel(
+    title = "Übersicht",
+    uebersichtUI("uebersicht", MANUALDATA, PORTFOLIODATA)
+  ),
+  nav_panel(
+    title = "Giro",
+    giroUI("giro", MANUALDATA)
+  ),
+  nav_panel(
+    title = "Depot",
+    depotUI("depot", PORTFOLIODATA)
+  ),
+  nav_panel(
+    title = "Wallet",
+    walletUI("wallet", PORTFOLIODATA)
+  ),
+  nav_panel(
+    title = "Daten",
+    fluidRow(
+      column(width = 12,
+             kontenUI("konten", MANUALDATA)
+      ),
+      column(width = 12,
+             gruppenUI("gruppen")
+      )
+    )
+  ),
+  nav_spacer(),
+  nav_menu(
+    title = "Links",
+    align = "right",
+    nav_item("x"),
+    nav_item("y")
   )
 )
+
 
 
 
@@ -85,10 +127,13 @@ ui <- page_fluid(
 # Define the server logic for the main app
 server <- function(input, output, session) {
   
-  uebersichtServer("uebersicht", MANUALDATA, PORTFOLIODATA)
-  girokontenServer("girokonten", MANUALDATA)
-  uploadServer("upload", MANUALDATA)
-  
+  uebersichtServer("uebersicht", MANUALDATA, PORTFOLIODATA, INFLATIONDATA)
+  giroServer("giro", MANUALDATA)
+  depotServer("depot", PORTFOLIODATA)
+  walletServer("wallet", PORTFOLIODATA)
+  kontenServer("konten", MANUALDATA)
+  gruppenServer("gruppen")
+
 }
 
 

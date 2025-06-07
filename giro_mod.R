@@ -19,7 +19,24 @@ nettobilanz <- function(info) {
   plot_data <- data %>%
     group_by(year_month) %>%
     summarise(sum = sum(BETRAG_EDITED, na.rm = TRUE), .groups = "drop") %>%
-    mutate(typ = case_when(sum < 0 ~ "Defizit", .default = "Überschuss"))
+    ungroup() %>%
+    mutate(typ = case_when(sum < 0 ~ "Defizit", .default = "Überschuss")) %>%
+    mutate(kategorie = "") 
+  
+  if(info$smooth == "Mittelwert") {
+    plot_data %<>%
+      group_by(kategorie) %>% 
+      mutate(sum = mean(sum)) %>%
+      ungroup()
+  }
+  
+  if(str_detect(info$smooth, "Monats Mittel")) {
+    monthavg <- as.numeric(gsub("-.*", "", info$smooth))
+    plot_data %<>%
+      group_by(kategorie) %>%
+      mutate(sum = zoo::rollapply(sum, monthavg, mean,align='right', fill=NA)) %>%
+      ungroup()
+  }
   
   # create plot ------------------------
   hc <- highchart() %>%
@@ -82,10 +99,11 @@ verlauf <- function(info) {
   }
   
   # 3 month rolling --------------------
-  if(info$smooth == "3-Monats Mittel") {
+  if(str_detect(info$smooth, "Monats Mittel")) {
+    monthavg <- as.numeric(gsub("-.*", "", info$smooth))
     plot_data %<>%
       group_by(kategorie) %>%
-      mutate(sum = zoo::rollapply(sum, 3, mean,align='right', fill=NA)) %>%
+      mutate(sum = zoo::rollapply(sum, monthavg, mean,align='right', fill=NA)) %>%
       ungroup()
   }
   
@@ -249,170 +267,131 @@ tabelle <- function(info) {
 # UI ===========================================================================
 # ==============================================================================
 
-girokontenUI <- function(id, girokonten) {
-  
-  ns <- NS(id)  # Namespace function to scope the module
-  
-  accordion_panels <- lapply(girokonten, function(account) {
-    account_id <- account$name  # Unique name for each account, used for output ID
-    bank <- account$bank
-    saldo <- format(account$data$SALDO[1], big.mark = ".", decimal.mark = ",")
-    accordion_panel(
-      title = paste0(account$display_name, " | ", saldo, "€"),  # Display name for the panel title
-      icon = img(src = paste0("icons/", bank, ".png"), style = "width: 20px; height: 20px;"),  # Custom icon with inline style
-      fluidRow(
-        column(12,
-               DTOutput(ns(account_id))  # Dynamic output ID for each account
-        )
-      )
-    )
-  })
+giroUI <- function(id, girokonten) {
+  ns <- NS(id)
   
   tagList(
-    fluidRow(
-
-      h1(""), h1(""),
-      column(12, 
-             accordion(
-               # Insert all dynamic account accordion panels here
-               do.call(tagList, accordion_panels),
-               open = FALSE  # Default open section
-             )
+    
+    navset_card_underline(
+      full_screen = TRUE,
+      # Tabs with underline style
+      nav_panel(
+        "Nettobilanz",
+        icon = bsicons::bs_icon("bar-chart"),
+        highchartOutput(ns("nettobilanz_plot"))
+      ),
+      nav_panel(
+        "Einnahmen",
+        icon = bsicons::bs_icon("graph-up"),
+        highchartOutput(ns("einnahmen_plot"))
       ),
       
-      h1(""), tags$head(tags$style(HTML("hr {border-top: 10px solid #111111;}"))), h1(""),
-
-      column(12,
-             accordion(
-               accordion_panel(
-                 title = "Auswahl filtern",
-                 icon = bsicons::bs_icon("filter"),
-                 fluidRow(
-                   column(3,
-                          dateRangeInput(ns("filter_date"), "Datum auswählen",
-                                         start = floor_date(Sys.Date(), unit = "month") %m-% years(1),
-                                         end = Sys.Date(),
-                                         max = Sys.Date())
-                   ),
-                   column(4, 
-                          selectInput(ns("filter_kategorien_einnahmen"),
-                                      "Kategorien in Einnahmen",
-                                      choices = NULL, selected = NULL,
-                                      multiple = TRUE, width = "100%")),
-                   column(5,
-                          selectInput(ns("filter_kategorien_ausgaben"),
-                                      "Kategorien in Ausgaben",
-                                      choices = NULL, selected = NULL,
-                                      multiple = TRUE, width = "100%"))
-                 )
-               ),
-               
-               accordion_panel(
-                 title = "Nettobilanz",
-                 icon = bsicons::bs_icon("bar-chart"),
-                 highchartOutput(ns("nettobilanz_plot"))  # Render Ausgaben plot here
-               ),
-               
-               accordion_panel(
-                 title = "Verlauf", 
-                 icon = bsicons::bs_icon("graph-up"),
-                 fluidRow(
-                   column(6, 
-                          radioButtons(ns("verlauf_art"), "Verlauf für:",
-                                       choices = c("Einnahmen", "Ausgaben", "Verhältnis"),
-                                       inline = TRUE)),
-                   column(6,
-                          radioButtons(ns("verlauf_smooth"), "Werte anzeigen als:",
-                                       choices = c("Total", "Mittelwert", "3-Monats Mittel"),
-                                       inline = TRUE))
-                 ),
-                 highchartOutput(ns("verlauf_plot"))  # Render Einnahmen plot here
-               ),
-               
-               accordion_panel(
-                 title = "Sankey",
-                 icon = bsicons::bs_icon("diagram-3"),
-                 radioButtons(ns("sankey_values"), "Werte anzeigen als:",
-                              choices = c("Summe", "Durchschnittsmonat"),
-                              inline = TRUE),
-                 highchartOutput(ns("sankey_plot"))
-               ),
-               accordion_panel(
-                 title = "Übersicht - Tabelle",
-                 icon = bsicons::bs_icon("table"),
-                 fluidRow(
-                   column(6, selectInput(ns("reactable_auswahl"), "Auswahl",
-                                         choices = c("Jahr" = "year",
-                                                     "Monat" = "year_month",
-                                                     "Einnahme/Ausgabe" = "typ",
-                                                     "Kategorie" = "kategorie",
-                                                     "Name" = "name"),
-                                         multiple = TRUE,
-                                         width = "100%"))
-                 ),
-                 reactableOutput(ns("tabelle_reactable"))  # Render Ausgaben plot here
-               ),
-               id = "acc"
-             )
+      nav_panel(
+        "Ausgaben",
+        icon = bsicons::bs_icon("graph-down"),
+        highchartOutput(ns("ausgaben_plot"))
+      ),
+      
+      nav_panel(
+        "Ausgaben / Einnahmen",
+        icon = bsicons::bs_icon("percent"),
+        highchartOutput(ns("verhältnis_plot"))
+      ),
+        
+      nav_panel(
+        "Sankey",
+        icon = bsicons::bs_icon("diagram-3"),
+        div(
+          class = "card-reveal-full-screen",
+          card_body(
+            radioButtons(ns("sankey_values"), "Werte anzeigen als:",
+                         choices = c("Summe", "Durchschnittsmonat"),
+                         inline = TRUE)
+          )
+        ),
+          highchartOutput(ns("sankey_plot"))
+      ),
+      
+      nav_panel(
+        "Tabelle",
+        icon = bsicons::bs_icon("table"),
+        div(
+          class = "card-reveal-full-screen",
+          card_body(
+            fluidRow(
+              column(6, selectInput(ns("reactable_auswahl"), "Auswahl",
+                                    choices = c("Jahr" = "year",
+                                                "Monat" = "year_month",
+                                                "Einnahme/Ausgabe" = "typ",
+                                                "Kategorie" = "kategorie",
+                                                "Name" = "name"),
+                                    selected = c("year_month", "kategorie"),
+                                    multiple = TRUE,
+                                    width = "100%"))
+            )
+          )
+        ),
+        reactableOutput(ns("tabelle_reactable"))
+      ),
+      
+      nav_panel(
+        "",
+        icon = bs_icon("gear"),
+        fluidRow(
+          column(3,
+                 dateRangeInput(ns("filter_date"), "Zeitraum auswählen",
+                                start = floor_date(Sys.Date(), unit = "month") %m-% months(12),
+                                end = Sys.Date(),
+                                max = Sys.Date())),
+          column(4, 
+                 selectInput(ns("filter_kategorien_einnahmen"),
+                             "Kategorien in Einnahmen",
+                             choices = NULL, selected = NULL,
+                             multiple = TRUE, width = "100%")),
+          column(4,
+                 selectInput(ns("filter_kategorien_ausgaben"),
+                             "Kategorien in Ausgaben",
+                             choices = NULL, selected = NULL,
+                             multiple = TRUE, width = "100%")),
+          column(1, 
+                 actionButton(ns("refresh_data"), label = "", icon = icon("repeat")))
+        ),
+        fluidRow(
+          column(12, radioButtons(ns("verlauf_smooth"), "Werte anzeigen als:",
+                                  choices = c("Total", "Mittelwert", "3-Monats Mittel", "6-Monats Mittel", "12-Monats Mittel"),
+                                  inline = TRUE))
+        )
       )
     )
   )
 }
 
-
 # ==============================================================================
 # SERVER =======================================================================
 # ==============================================================================
 
-girokontenServer <- function(id, girokonten) {
+giroServer <- function(id, girokonten) {
   moduleServer(id, function(input, output, session) {
     
-    # prepare data for page ----------------------------------------------------
-    # Loop over each account in the finanzkonto list
-    lapply(girokonten, function(account) {
-      account_id <- account$name  # Assuming 'name' is the account ID
-      #bank <- account$bank
-      #konto <- account$konto
+    load_gruppen <- function() read.csv(paste0("./MANUALDATA/", "gruppen.csv"))
+                                        
+    girokonten_rv <- reactiveVal(read_MANUALDATA())
+    gruppen_rv <- reactiveVal(load_gruppen())
+    
+    observeEvent(input$refresh_data, {
+      new_data <- read_MANUALDATA()
+      girokonten_rv(new_data)
       
-      # ADD ICONS
-      #icons <- list.files("./www/icons_girokonten/")
-      #icons <- gsub("\\.png", "", icons)
-      #kontoauszug <- account$data %>% mutate(GEGENSEITE = case_when(GEGENSEITE %in% icons ~ paste0('<img src="icons_girokonten/', GEGENSEITE, '.png" style="height:20px;width:20px;"></img>'), .default = GEGENSEITE))
-        
-        
-      
-      # Render the editable DataTable for each account
-      output[[account_id]] <- renderDT({
-        req(account$data)  # Ensure account data is available
-        DT::datatable(
-          account$data,
-          rownames = FALSE,
-          filter = 'top',
-          options = list(pageLength = -1, dom = 't'),
-          escape = FALSE,  # Allows HTML rendering
-          editable = FALSE  # Enable cell editing
-        )
-      })
-      
-      # Capture the edits and save to the respective CSV file dynamically
-      #observeEvent(input[[paste0(account_id, '_cell_edit')]], {
-      #  info <- input[[paste0(account_id, '_cell_edit')]]
-      #  
-      #  # Update the account's data with the edited value
-      #  edited_data <- account$data
-      #  edited_data[info$row, info$col + 1] <- info$value  # Update the correct cell
-      #  
-      #  overwrite_DATA(bank = bank, konto = konto, filename = account_id, data_neu = edited_data)
-      #})
-      
+      new_gruppen <- load_gruppen()
+      gruppen_rv(new_gruppen)
     })
-
+    
     
     # komplette daten
     GIR_allekategorien <- reactive({
       
       # Girokonten sind konten mit GIR oder GTH im Namen
-      GIR <- bind_rows(lapply(girokonten, function(list) list[["data"]])) %>%
+      GIR <- bind_rows(lapply(girokonten_rv(), function(list) list[["data"]])) %>%
         
         mutate(DATUM = as.Date(DATUM)) %>%
         # filter date aus auswahl - zuerst, um speed zu erhöhen für join der kategorien
@@ -433,7 +412,7 @@ girokontenServer <- function(id, girokonten) {
                                       .default = "Einnahme")))
       
       # load gruppen for matching ------
-      gruppen <- read.csv(paste0("./MANUALDATA/", "gruppen.csv"))  %>%
+      gruppen <- gruppen_rv()  %>%
         filter(kategorie != "") %>%
         mutate(patterns = tolower(patterns))
       patterns <- gruppen$patterns
@@ -511,23 +490,43 @@ girokontenServer <- function(id, girokonten) {
     output$nettobilanz_plot <- renderHighchart({
       req(GIR())
       nettobilanz_info <- list(
-        data = GIR()
+        data = GIR(),
+        smooth = input$verlauf_smooth
       )
       nettobilanz(nettobilanz_info)
     })
     
     
     # Verlauf --------------------------
-    output$verlauf_plot <- renderHighchart({
+    output$einnahmen_plot <- renderHighchart({
       req(GIR())
       info_verlauf <- list(
         data = GIR(),
-        art = input$verlauf_art, # Einnahme/Ausgabe/Verhältnis
+        art = "Einnahmen", # Einnahme/Ausgabe/Verhältnis
         smooth = input$verlauf_smooth
       )
       verlauf(info = info_verlauf)
     })
     
+    output$ausgaben_plot <- renderHighchart({
+      req(GIR())
+      info_verlauf <- list(
+        data = GIR(),
+        art = "Ausgaben", # Einnahme/Ausgabe/Verhältnis
+        smooth = input$verlauf_smooth
+      )
+      verlauf(info = info_verlauf)
+    })
+    
+    output$verhältnis_plot <- renderHighchart({
+      req(GIR())
+      info_verlauf <- list(
+        data = GIR(),
+        art = "Verhältnis", # Einnahme/Ausgabe/Verhältnis
+        smooth = input$verlauf_smooth
+      )
+      verlauf(info = info_verlauf)
+    })
     
     # Sankey Diagramm -------------------
     output$sankey_plot <- renderHighchart({

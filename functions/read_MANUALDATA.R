@@ -2,11 +2,10 @@
 # each list is a konto, containing the data and a header
 
 # filter_typID is _* ID in name of csv file
-read_MANUALDATA <- function(datapath) {
+read_MANUALDATA <- function(datapath = "./MANUALDATA/", konto = NULL) {
 
   message("... loading MANUALDATA")
   
-  # finanzkonten file names - are IDentifier for each konto
   filenames_csv <- list.files(path = datapath)
   filenames_csv <- filenames_csv[filenames_csv != "gruppen.csv"]
   

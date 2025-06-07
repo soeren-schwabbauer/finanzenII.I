@@ -10,10 +10,10 @@ create_PORTFOLIODATA <- function(manualdata, historicaldata) {
     mutate(name = GEGENSEITE) %>%
     select(name, DATUM, VERWENDUNGSZWECK, BETRAG) %>%
     # filter wertpapierkäufe/cryptokäufe
-    filter(str_detect("WERTPAPIERHANDEL|CRYPTOHANDEL", VERWENDUNGSZWECK)) %>%
+    filter(str_detect("ETFHANDEL|AKTIENHANDEL|CRYPTOHANDEL|SPARBRIEFHANDEL", VERWENDUNGSZWECK)) %>%
     
-    separate_wider_delim(VERWENDUNGSZWECK, delim = "|", names = c("kaufart", "ID", "ANZAHL")) %>%
-    
+    separate_wider_delim(VERWENDUNGSZWECK, delim = "|", names = c("form", "ID", "ANZAHL")) %>%
+    mutate(form = gsub("HANDEL", "", form)) %>%
     # format variables
     mutate(BETRAG = -BETRAG) %>%
     
@@ -23,7 +23,7 @@ create_PORTFOLIODATA <- function(manualdata, historicaldata) {
     mutate(ANZAHL = cumsum(ANZAHL),
            SALDO_raw = cumsum(BETRAG)) %>%
     ungroup() %>%
-    select(name, DATUM, ID, ANZAHL, SALDO_raw)
+    select(name, form, DATUM, ID, ANZAHL, SALDO_raw)
   
   
   data_ts <-
@@ -43,13 +43,13 @@ create_PORTFOLIODATA <- function(manualdata, historicaldata) {
     
     # assign each saldo
     group_by(name, ID) %>%
-    fill(ANZAHL, SALDO_raw, .direction = "down") %>%
+    fill(ANZAHL, SALDO_raw, form, .direction = "down") %>%
     ungroup() %>%
     # filter NAs for performance
     filter(!is.na(ANZAHL)) %>%
     
     # saldo mit rendite
-    mutate(SALDO_rendite = ANZAHL * openingprice) 
+    mutate(SALDO_rendite = ANZAHL * price) 
     
   
   data_list <- split(data_ts, list(data_ts$name)) 
@@ -60,12 +60,17 @@ create_PORTFOLIODATA <- function(manualdata, historicaldata) {
     df <- as.data.frame(df)  # Convert tibble to data.frame
     name = unique(df$name)
 
+    # HARDCODE für angezeigte names
     if(name == "BIPGATWWXXX_WAL") {
       display_name = "BITPANDA - WALLET"
     } else if(name == "INGDDEFFXXX_DEP") {
       display_name = "ING - DEPOT"
     } else if(name == "BIWBDE33XXX_DEP") {
       display_name = "FLATEX - DEPOT"
+    } else if(name == "INGDDEFFXXX_SPB"){
+      display_name = "ING - SPARBRIEF"
+    } else if(name == "TRBKDEBBXXX_DEP") {
+      display_name = "TRADEREPUBLIC - DEPOT"
     }
     
     konto = gsub(".* ", "", display_name)

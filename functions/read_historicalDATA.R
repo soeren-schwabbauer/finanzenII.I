@@ -3,7 +3,7 @@
 
 read_historicalDATA <- function(datapath) {
 
-  message("... loading historicalDATA")
+  message("... reading historicalDATA")
   
   files <- list.files(datapath, full.names = TRUE)
   historicaldata <- list()
@@ -16,7 +16,7 @@ read_historicalDATA <- function(datapath) {
      data <- read.csv(i) %>%
       
       mutate(DATUM = as.Date(DATUM),
-             openingprice = as.numeric(openingprice),
+             price = as.numeric(price),
              ID = ID) %>%
       arrange(DATUM) 
     
@@ -28,7 +28,7 @@ read_historicalDATA <- function(datapath) {
                                  by   = "day")) %>%
       
       left_join(data, by = "DATUM") %>%
-      fill(openingprice, ID, .direction = "down")
+      fill(price, ID, .direction = "down")
   }
   
   # all historical data
