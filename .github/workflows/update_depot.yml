@@ -2,7 +2,7 @@ name: ETF-Daten aktualisieren (stündlich)
 
 on:
   schedule:
-    - cron: '5 * * * *'  # jede Stunde um 5 Minuten nach voller Stunde (UTC)
+    - cron: '0 * * * *'  # jede Stunde um 5 Minuten nach voller Stunde (UTC)
   workflow_dispatch:
 
 jobs:
@@ -18,7 +18,11 @@ jobs:
 
       - name: Pakete installieren
         run: |
-          Rscript -e 'install.packages(c("rvest", "readr", "dplyr", "stringr", "xml2"))'
+          Rscript -e 'install.packages("rvest", dependencies = TRUE, repos = "https://cloud.r-project.org")'
+          Rscript -e 'install.packages("readr", dependencies = TRUE, repos = "https://cloud.r-project.org")'
+          Rscript -e 'install.packages("dplyr", dependencies = TRUE, repos = "https://cloud.r-project.org")'
+          Rscript -e 'install.packages("stringr", dependencies = TRUE, repos = "https://cloud.r-project.org")'
+          Rscript -e 'install.packages("xml2", dependencies = TRUE, repos = "https://cloud.r-project.org")'
 
       - name: ETF-Update ausführen
         run: |
