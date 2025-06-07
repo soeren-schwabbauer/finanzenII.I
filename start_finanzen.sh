@@ -1,2 +1,2 @@
 #!/bin/bash
-Rscript -e "shiny::runApp('/home/soeren-schwabbauer/repositories/finanzenII.I', launch.browser=TRUE)"
+Rscript -e "shiny::runApp('/home/soeren-schwabbauer/repositories/finanzen', launch.browser=TRUE)"

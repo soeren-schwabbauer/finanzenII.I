@@ -33,16 +33,22 @@ library(jsonlite)
 
 library(dplyr)
 
+# scrape latest wallet & stock data ============================================
 
-# Read Manual Data =============================================================
+source("./functions/updatedata_wallet.R")
+source("./functions/updatedata_depot.R")
+
+
+# read manual data =============================================================
 
 source("./functions/readdata_manual.R")
 data_manual <- readdata_maual()
 
 
-# read Historical Data =========================================================
+# read historical hata =========================================================
 
-# ziel ist aus den Preisen den wert des protfolios/sparbriefs, etc. zu berechnen
+# ziel ist aus den Preisen den anzahl der aktien/sparbriefs, etc. den gesamtwert je 
+# depot / sparbrief zu berechnen
 source("./functions/readdata_historical.R")
 
 data_depot <- readdata_historical(datapath = "./data/depot/")
@@ -56,17 +62,18 @@ data_portfolio <- createdata_portfolio(manualdata = data_manual, historicaldata 
 
 
 
-INFLATIONDATA <- read.csv("./data/inflation.csv")
-INFLATIONDATA$datum <- as.Date(paste0("01-", gsub("\\.", "", INFLATIONDATA$datum)), format = "%d-%b%y")
+data_inflation <- read.csv("./data/inflation.csv", comment.char = "#")
+data_inflation$datum <- as.Date(paste0("01-", gsub("\\.", "", data_inflation$datum)), format = "%d-%b%y")
 
 ################################################################################
 # load modules for shiny app ###################################################
+
 source("./uebersicht_mod.R")
-source("./giro_mod.R")
-source("./depot_mod.R")
-source("./konten_mod.R")
-source("./wallet_mod.R")
-source("./gruppen_mod.R")
+
+source("./mod_giro.R")
+
+source("./mod_konten.R")
+source("./mod_gruppen.R")
 
 
 ################################################################################
@@ -87,14 +94,6 @@ ui <- page_navbar(
   nav_panel(
     title = "Giro",
     giroUI("giro", data_manual)
-  ),
-  nav_panel(
-    title = "Depot",
-    depotUI("depot", data_portfolio)
-  ),
-  nav_panel(
-    title = "Wallet",
-    walletUI("wallet", data_portfolio)
   ),
   nav_panel(
     title = "Daten",
@@ -124,10 +123,8 @@ ui <- page_navbar(
 # Define the server logic for the main app
 server <- function(input, output, session) {
   
-  uebersichtServer("uebersicht", data_manual, data_portfolio, INFLATIONDATA)
+  uebersichtServer("uebersicht", data_manual, data_portfolio, data_inflation)
   giroServer("giro", data_manual)
-  depotServer("depot", data_portfolio)
-  walletServer("wallet", data_portfolio)
   kontenServer("konten", data_manual)
   gruppenServer("gruppen")
 

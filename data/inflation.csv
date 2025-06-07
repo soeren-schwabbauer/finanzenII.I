@@ -1,3 +1,6 @@
+# Quelle: https://www.statistik.at/statistiken/volkswirtschaft-und-oeffentliche-finanzen/preise-und-preisindizes/verbraucherpreisindex-vpi/hvpi
+# bzw.: https://www.statistik.at/fileadmin/pages/214/2_Verbraucherpreisindizes_ab_1990.pdf
+# muss regelmäßig händisch aktualisiert werden
 datum,preis
 Jan.20,107.6
 Feb.20,107.8

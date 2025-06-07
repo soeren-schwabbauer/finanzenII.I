@@ -1,16 +1,11 @@
-library(rvest)
-library(dplyr)
-library(readr)
-library(stringr)
-library(xml2)
-
-message("Updating ETF data...")
+message("Updating Depot data...")
 
 # update nur an wochentagen nötig
 is_weekday <- !weekdays(Sys.Date()) %in% c("Saturday", "Sunday")
 
 # Liste aller CSV-Dateien im ETF-Ordner
 files <- list.files("./data/depot", full.names = TRUE)
+files <- files[!str_detect(files, "info")]
 
 for (i in files) {
   
