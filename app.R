@@ -24,8 +24,6 @@ library(igraph)
 library(RColorBrewer)
 library(reactable)
 library(DT)
-library(visNetwork)
-library(plotly)
 
 # for API
 library(rvest)
