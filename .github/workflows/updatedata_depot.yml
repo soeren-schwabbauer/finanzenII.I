@@ -1,0 +1,26 @@
+name: Update Depot Data
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'  # Weekdays at 6 AM UTC
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-chromedriver
+          pip install -r requirements.txt
+
+      - name: Run update script
+        run: python updatedata_depot.py
