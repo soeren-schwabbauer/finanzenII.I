@@ -68,12 +68,12 @@ data_inflation$datum <- as.Date(paste0("01-", gsub("\\.", "", data_inflation$dat
 ################################################################################
 # load modules for shiny app ###################################################
 
-source("./uebersicht_mod.R")
+source("./modules/uebersicht.R")
 
-source("./mod_giro.R")
+source("./modules/giro.R")
 
-source("./mod_konten.R")
-source("./mod_gruppen.R")
+source("./modules/konten.R")
+source("./modules/gruppen.R")
 
 
 ################################################################################
