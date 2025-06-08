@@ -1,4 +1,4 @@
-name: Update Depot Data
+name: Update Depot Price Data
 
 on:
   schedule:
@@ -33,4 +33,4 @@ jobs:
         uses: browser-actions/setup-chrome@v1
 
       - name: Run update script
-        run: python functions/updatedata_depot.py
+        run: python functions/update_prices_depot.py
