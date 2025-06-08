@@ -1,16 +1,16 @@
-name: Update Depot Price Data
+name: Update Financial Data
 
 on:
   schedule:
-    - cron: '0 6 * * 1-5'  # Weekdays at 6 AM UTC
-  workflow_dispatch:
+    - cron: '0 * * * *'   # Every hour on the hour
+    workflow_dispatch:       # Allow manual triggering
 
 jobs:
   update:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -26,11 +26,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install Python dependencies
+      - name: Install Python packages
         run: pip install -r requirements.txt
 
       - name: Set up headless Chrome
         uses: browser-actions/setup-chrome@v1
 
-      - name: Run update script
+      - name: Run Depot Update
         run: python functions/update_prices_depot.py
+
+      - name: Run Wallet Update
+        run: python functions/update_prices_wallet.py
