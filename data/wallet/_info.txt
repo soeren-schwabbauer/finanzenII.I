@@ -1,1 +1,1 @@
-Daten werden automatissch aktualisiert via ./R/update_data_wallet.R
+Daten werden automatissch aktualisiert via Git Hub Action
