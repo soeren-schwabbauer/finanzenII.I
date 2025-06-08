@@ -1,84 +1,59 @@
 import os
 import pandas as pd
-from datetime import datetime
+import requests
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-import time
+from io import StringIO
 
-print("🔄 Updating Wallet Data")
+print("Updating Wallet Data")
 
-# Folder for wallet data
-wallet_folder = "./data/wallet"
-files = [f for f in os.listdir(wallet_folder) if "BTC" in f and "info" not in f]
+files = [f for f in os.listdir("./data/wallet") if "info" not in f and f.endswith(".csv")]
+files = [os.path.join("./data/wallet", f) for f in files]
 
-# Set up headless Chrome (GitHub Actions compatible)
-chrome_path = os.getenv("CHROME_PATH", "/usr/bin/google-chrome")
-options = Options()
-options.add_argument("--headless=new")
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-gpu")
-options.binary_location = chrome_path
-
-driver = webdriver.Chrome(options=options)
-
-for filename in files:
-    filepath = os.path.join(wallet_folder, filename)
-
+for file in files:
     try:
-        # Load existing data
-        olddata = pd.read_csv(filepath, parse_dates=['datum'])
+        print(f"\n🔄 Verarbeite Datei: {file}")
+
+        # Datei laden
+        olddata = pd.read_csv(file)
+        olddata['datum'] = pd.to_datetime(olddata['datum'])
         olddata['preis'] = pd.to_numeric(olddata['preis'], errors='coerce')
-        olddata = olddata.dropna(subset=['datum', 'preis'])
-        olddata['datum'] = olddata['datum'].dt.date  # normalize to datetime.date
 
-        # Remove today's row (in case we want to replace it)
-        today = datetime.today().date()
-        olddata = olddata[olddata['datum'] != today]
+        # Maximaldatum holen und entsprechende Zeile entfernen
+        maxdate = olddata['datum'].max()
+        print("📅 Entferne Eintrag mit Datum:", maxdate.date())
+        olddata = olddata[olddata['datum'] < maxdate]
 
-        if olddata.empty:
-            print(f"⚠️ Warning: {filename} has no remaining rows after removing today.")
-            continue
+        # BTC-Daten von Website laden
+        url = "https://btcdirect.eu/de-at/bitcoin-kurs"
+        resp = requests.get(url)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        table = soup.find("table")
 
-        maxdate = max(olddata['datum'])
-        print(f"📅 Latest date in {filename} (excluding today): {maxdate}")
+        if table is None:
+            raise ValueError("⚠️ Keine Tabelle auf der Seite gefunden")
 
-        # Scrape price data from btcdirect.eu
-        driver.get("https://btcdirect.eu/de-at/bitcoin-kurs")
-        time.sleep(5)
+        newdata = pd.read_html(StringIO(str(table)))[0]
+        newdata.columns = newdata.columns.str.strip()
+        newdata = newdata.rename(columns={"Datum": "datum", "Preis": "preis"})
 
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        table = soup.find('table')
+        newdata['datum'] = pd.to_datetime(newdata['datum'], format="%m/%d/%y", errors='coerce')
+        newdata['preis'] = newdata['preis'].replace({'€': '', ',': ''}, regex=True).astype(float)
+        newdata = newdata[['datum', 'preis']]
 
-        if not table:
-            raise ValueError("No table found on btcdirect.eu")
+        print("🆕 Neue Daten (min–max):", newdata['datum'].min().date(), "-", newdata['datum'].max().date())
 
-        rows = table.find_all('tr')[1:]
-        new_rows = []
+        # Nur neue Daten ab entferntem Datum einfügen
+        newdata = newdata[newdata['datum'] >= maxdate]
 
-        for row in rows:
-            cols = [td.get_text(strip=True) for td in row.find_all('td')]
-            if len(cols) < 2:
-                continue
-            try:
-                datum = datetime.strptime(cols[0], "%d.%m.%Y").date()
-                preis = float(cols[1].replace("€", "").replace(".", "").replace(",", "."))
-            except Exception:
-                continue
+        print("➕ Neue Zeilen:", len(newdata))
 
-            if datum > maxdate or datum == today:
-                new_rows.append({'datum': datum, 'preis': preis})
-
-        if new_rows:
-            newdata = pd.DataFrame(new_rows)
+        if not newdata.empty:
             updated = pd.concat([newdata, olddata], ignore_index=True)
-            updated = updated.sort_values(by="datum", ascending=False)
-            updated.to_csv(filepath, index=False)
-            print(f"✅ Successfully updated {filename} with {len(new_rows)} new rows.")
+            updated = updated.sort_values("datum", ascending=False)  # neuestes Datum nach oben
+            updated.to_csv(file, index=False)
+            print(f"✅ {file} aktualisiert mit {len(newdata)} neuen Zeilen")
         else:
-            print(f"⏩ No new data found for {filename}")
+            print("ℹ️ Keine neuen Daten vorhanden")
 
     except Exception as e:
-        print(f"❌ ERROR in {filename}: {e}")
-
-driver.quit()
+        print(f"❌ Fehler in {file}: {e}")
