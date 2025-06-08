@@ -8,11 +8,11 @@ import time
 
 print("🔄 Updating Wallet Data")
 
-# Folder containing wallet CSVs
+# Folder for wallet data
 wallet_folder = "./data/wallet"
 files = [f for f in os.listdir(wallet_folder) if "BTC" in f and "info" not in f]
 
-# Set up headless Chrome (same setup as in updatedata_depot.py)
+# Set up headless Chrome (GitHub Actions compatible)
 chrome_path = os.getenv("CHROME_PATH", "/usr/bin/google-chrome")
 options = Options()
 options.add_argument("--headless=new")
@@ -26,18 +26,22 @@ for filename in files:
     filepath = os.path.join(wallet_folder, filename)
 
     try:
+        # Load old data
         olddata = pd.read_csv(filepath, parse_dates=['datum'])
         olddata['preis'] = pd.to_numeric(olddata['preis'], errors='coerce')
         olddata = olddata.dropna(subset=['datum', 'preis'])
-        olddata = olddata.iloc[:-1]  # remove last row
+        olddata['datum'] = olddata['datum'].dt.date  # normalize to datetime.date
 
-        maxdate = olddata['datum'].max()
-
-        if maxdate >= datetime.today().date():
-            print(f"⏩ {filename} is already up-to-date")
+        if len(olddata) > 0:
+            olddata = olddata.iloc[:-1]  # remove last row
+        else:
+            print(f"⚠️ Warning: {filename} has no usable data.")
             continue
 
-        # Scrape Bitcoin price table
+        maxdate = max(olddata['datum'])
+        print(f"📅 Latest date in {filename}: {maxdate}")
+
+        # Scrape price data from btcdirect.eu
         driver.get("https://btcdirect.eu/de-at/bitcoin-kurs")
         time.sleep(5)
 
@@ -45,9 +49,9 @@ for filename in files:
         table = soup.find('table')
 
         if not table:
-            raise ValueError("No table found on page")
+            raise ValueError("No table found on btcdirect.eu")
 
-        rows = table.find_all('tr')[1:]  # skip header
+        rows = table.find_all('tr')[1:]
         new_rows = []
 
         for row in rows:
@@ -56,20 +60,21 @@ for filename in files:
                 continue
             try:
                 datum = datetime.strptime(cols[0], "%d.%m.%Y").date()
-                preis = float(cols[1].replace("€", "").replace(",", "").replace(".", "", cols[1].count(".") - 1))
-                if datum > maxdate:
-                    new_rows.append({'datum': datum, 'preis': preis})
+                preis = float(cols[1].replace("€", "").replace(".", "").replace(",", "."))
             except Exception:
                 continue
+
+            if datum > maxdate:
+                new_rows.append({'datum': datum, 'preis': preis})
 
         if new_rows:
             newdata = pd.DataFrame(new_rows)
             updated = pd.concat([newdata, olddata], ignore_index=True)
             updated = updated.sort_values(by="datum", ascending=False)
             updated.to_csv(filepath, index=False)
-            print(f"✅ Successfully updated {filename}")
+            print(f"✅ Successfully updated {filename} with {len(new_rows)} new rows.")
         else:
-            print(f"⏩ No new data for {filename}")
+            print(f"⏩ No new data found for {filename}")
 
     except Exception as e:
         print(f"❌ ERROR in {filename}: {e}")
