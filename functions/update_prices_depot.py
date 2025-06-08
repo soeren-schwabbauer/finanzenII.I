@@ -10,9 +10,9 @@ print("🔄 Updating Depot data...")
 
 # Skip update on weekends
 today = datetime.today()
-if today.weekday() >= 5:
-    print("⏩ Weekend – no update needed.")
-    exit()
+#if today.weekday() >= 5:
+#    print("⏩ Weekend – no update needed.")
+#    exit()
 
 # Mapping ISINs to Investing.com URLs
 isin_url_map = {
