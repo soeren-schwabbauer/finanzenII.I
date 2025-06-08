@@ -33,4 +33,4 @@ jobs:
         uses: browser-actions/setup-chrome@v1
 
       - name: Run update script
-        run: python functions/update_depot.py
+        run: python functions/updatedata_depot.py
