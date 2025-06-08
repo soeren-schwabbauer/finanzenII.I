@@ -26,11 +26,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-chromedriver
-          pip install -r requirements.txt
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Set up headless Chrome
+        uses: browser-actions/setup-chrome@v1
 
       - name: Run update script
-        run: python update_depot.py
+        run: python functions/update_depot.py

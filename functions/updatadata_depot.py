@@ -21,64 +21,65 @@ isin_url_map = {
     "LU0908500753": "https://www.investing.com/etfs/lyxor-stoxx-europe-600-dr-c-historical-data?cid=1156753"
 }
 
-# List all CSVs (excluding those with "info" in the name)
+# List all CSV files in ./data/depot (excluding "info" files)
 data_folder = "./data/depot"
 files = [f for f in os.listdir(data_folder) if f.endswith(".csv") and "info" not in f]
 
-# Set up Selenium (headless Chrome)
+# Set up headless Chrome (for GitHub Actions)
+chrome_path = os.getenv("CHROME_PATH", "/usr/bin/google-chrome")
 options = Options()
 options.add_argument("--headless=new")
-options.add_argument("--disable-gpu")
 options.add_argument("--no-sandbox")
+options.add_argument("--disable-gpu")
+options.binary_location = chrome_path
+
 driver = webdriver.Chrome(options=options)
 
 for filename in files:
     filepath = os.path.join(data_folder, filename)
-    
-    # Identify ISIN
-    isin = next((isin for isin in isin_url_map if isin in filename), None)
+
+    # Find matching ISIN
+    isin = next((key for key in isin_url_map if key in filename), None)
     if not isin:
-        print(f"⏩ No URL for {filename}, skipping.")
+        print(f"⏩ No matching ISIN for {filename}, skipping.")
         continue
-    
+
     try:
-        # Load existing data
+        # Load old data
         olddata = pd.read_csv(filepath, parse_dates=['datum'])
         olddata['preis'] = pd.to_numeric(olddata['preis'], errors='coerce')
         olddata = olddata.dropna(subset=['datum', 'preis'])
 
-        # Remove the top row for today if it's a weekday
+        # Remove top row (most recent), to re-fetch if updated
         olddata = olddata.iloc[1:]
         maxdate = olddata['datum'].max()
 
-        # Load Investing.com page
+        # Fetch updated data from Investing.com
         driver.get(isin_url_map[isin])
-        time.sleep(5)  # wait for JS to load
+        time.sleep(5)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        table = soup.find_all('table')[1]  # second table
+        table = soup.find_all('table')[1]
 
-        rows = table.find_all('tr')[1:]  # skip header
+        rows = table.find_all('tr')[1:]
         new_rows = []
 
         for row in rows:
             cols = [td.get_text(strip=True) for td in row.find_all('td')]
             if len(cols) < 2:
                 continue
-            date_str = cols[0]
-            price_str = cols[1].replace(",", "")
             try:
-                datum = datetime.strptime(date_str, "%b %d, %Y").date()
-                preis = float(price_str)
-            except ValueError:
+                datum = datetime.strptime(cols[0], "%b %d, %Y").date()
+                preis = float(cols[1].replace(",", ""))
+            except Exception:
                 continue
             if datum > maxdate:
-                new_rows.append({'datum': datum, 'preis': preis})
+                new_rows.append({"datum": datum, "preis": preis})
 
         if new_rows:
             newdata = pd.DataFrame(new_rows)
             updated = pd.concat([newdata, olddata], ignore_index=True)
-            updated = updated.sort_values(by='datum', ascending=False)
+            updated = updated.sort_values(by="datum", ascending=False)
             updated.to_csv(filepath, index=False)
             print(f"✅ Updated: {filename}")
         else:
