@@ -9,7 +9,7 @@ import time
 print("🔄 Updating Depot data...")
 
 # Skip update on weekends
-today = datetime.today()
+#today = datetime.today()
 #if today.weekday() >= 5:
 #    print("⏩ Weekend – no update needed.")
 #    exit()
@@ -25,7 +25,7 @@ isin_url_map = {
 data_folder = "./data/depot"
 files = [f for f in os.listdir(data_folder) if f.endswith(".csv") and "info" not in f]
 
-# Set up headless Chrome (for GitHub Actions)
+# Set up headless Chrome
 chrome_path = os.getenv("CHROME_PATH", "/usr/bin/google-chrome")
 options = Options()
 options.add_argument("--headless=new")
@@ -45,16 +45,23 @@ for filename in files:
         continue
 
     try:
-        # Load old data
+        # Load existing data
         olddata = pd.read_csv(filepath, parse_dates=['datum'])
         olddata['preis'] = pd.to_numeric(olddata['preis'], errors='coerce')
         olddata = olddata.dropna(subset=['datum', 'preis'])
 
-        # Remove top row (most recent), to re-fetch if updated
-        olddata = olddata.iloc[1:]
-        maxdate = olddata['datum'].max()
+        # Normalize date column to date only
+        olddata['datum'] = olddata['datum'].dt.date
 
-        # Fetch updated data from Investing.com
+        if len(olddata) > 0:
+            olddata = olddata.iloc[1:]  # Remove most recent row
+        else:
+            print(f"⚠️ Warning: {filename} has no usable data.")
+            continue
+
+        maxdate = max(olddata['datum'])
+
+        # Fetch new data
         driver.get(isin_url_map[isin])
         time.sleep(5)
 
@@ -73,17 +80,18 @@ for filename in files:
                 preis = float(cols[1].replace(",", ""))
             except Exception:
                 continue
+
             if datum > maxdate:
-                new_rows.append({"datum": datum, "preis": preis})
+                new_rows.append({'datum': datum, 'preis': preis})
 
         if new_rows:
             newdata = pd.DataFrame(new_rows)
             updated = pd.concat([newdata, olddata], ignore_index=True)
             updated = updated.sort_values(by="datum", ascending=False)
             updated.to_csv(filepath, index=False)
-            print(f"✅ Updated: {filename}")
+            print(f"✅ Successfully updated {filename}")
         else:
-            print(f"⏩ Already up-to-date: {filename}")
+            print(f"⏩ {filename} is already up-to-date")
 
     except Exception as e:
         print(f"❌ Error processing {filename}: {e}")
