@@ -26,20 +26,22 @@ for filename in files:
     filepath = os.path.join(wallet_folder, filename)
 
     try:
-        # Load old data
+        # Load existing data
         olddata = pd.read_csv(filepath, parse_dates=['datum'])
         olddata['preis'] = pd.to_numeric(olddata['preis'], errors='coerce')
         olddata = olddata.dropna(subset=['datum', 'preis'])
         olddata['datum'] = olddata['datum'].dt.date  # normalize to datetime.date
 
-        if len(olddata) > 0:
-            olddata = olddata.iloc[:-1]  # remove last row
-        else:
-            print(f"⚠️ Warning: {filename} has no usable data.")
+        # Remove today's row (in case we want to replace it)
+        today = datetime.today().date()
+        olddata = olddata[olddata['datum'] != today]
+
+        if olddata.empty:
+            print(f"⚠️ Warning: {filename} has no remaining rows after removing today.")
             continue
 
         maxdate = max(olddata['datum'])
-        print(f"📅 Latest date in {filename}: {maxdate}")
+        print(f"📅 Latest date in {filename} (excluding today): {maxdate}")
 
         # Scrape price data from btcdirect.eu
         driver.get("https://btcdirect.eu/de-at/bitcoin-kurs")
@@ -64,7 +66,7 @@ for filename in files:
             except Exception:
                 continue
 
-            if datum > maxdate:
+            if datum > maxdate or datum == today:
                 new_rows.append({'datum': datum, 'preis': preis})
 
         if new_rows:
