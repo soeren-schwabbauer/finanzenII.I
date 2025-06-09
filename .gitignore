@@ -3,6 +3,5 @@
 .RData
 .Ruserdata
 data/manual/
-data/sparbrief/
 git.csv
 *.sh

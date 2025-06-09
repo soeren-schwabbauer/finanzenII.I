@@ -27,11 +27,6 @@ uebersichtUI <- function(id, finanzkonto, bank_konto) {
         "Saldoentwicklung",
         value = uiOutput(ns("saldoentwicklung")),
         showcase = bs_icon("piggy-bank-fill")
-      ),
-      value_box(
-        "Road to 100k",
-        value = uiOutput(ns("roadto100k")),
-        showcase = bs_icon("trophy")
       )
     ),
     
@@ -42,13 +37,6 @@ uebersichtUI <- function(id, finanzkonto, bank_konto) {
         title = "Übersicht",
         card_body(
           highchartOutput(ns("uebersicht_plot"))
-        )
-      ),
-      
-      nav_panel(
-        title = "Road to 100k",
-        card_body(
-          highchartOutput(ns("trend"))
         )
       ),
       
@@ -324,24 +312,6 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
     })
     
     
-    output$roadto100k <- renderText({
-      
-      avg_per_day <- full_agg() %>%
-        mutate(diff = saldo_sum - lag(saldo_sum)) %>%
-        summarise(mean = mean(diff, na.rm = TRUE)) %>%
-        pull()
-      
-      diffdays <- as.numeric(max(full_agg()$datum) - min(full_agg()$datum))
-      
-      total_heute <- full_agg() %>% filter(datum == max(datum)) %>% pull(saldo_sum)
-      
-      days <- round((100000 - total_heute) / avg_per_day,0)
-      
-      info <- paste0(format(Sys.Date() + days, "%d.%m.%Y"))
-      return(info)
-      
-    })
-    
     output$totalsaldo <- renderText({
       
       info <- full_agg() %>% filter(datum == max(datum)) %>% pull(saldo_sum)
@@ -361,64 +331,5 @@ uebersichtServer <- function(id, MANUALDATA, PORTFOLIODATA, INFLATIONDATA, bank_
       
     })
     
-    output$trend <- renderHighchart({
-      
-      data <- full_agg()
-      # Zielwert
-      zielwert <- 100000
-      min_index <- 20  # Skip early noisy days
-      
-      # Funktion zur Prognose
-      berechne_prognosedatum <- function(daten_bis_jetzt, zielwert) {
-        tage <- as.numeric(daten_bis_jetzt$datum - min(daten_bis_jetzt$datum))
-        saldo <- daten_bis_jetzt$saldo_sum
-        
-        modell <- lm(saldo ~ tage)
-        prognose_tag <- (zielwert - coef(modell)[1]) / coef(modell)[2]
-        prognose_datum <- min(daten_bis_jetzt$datum) + round(prognose_tag)
-        
-        return(prognose_datum)
-      }
-      
-      # Prognose berechnen (nur für stabile Phase)
-      prognosen <- sapply(1:nrow(data), function(i) {
-        if (i >= min_index) {
-          berechne_prognosedatum(data[1:i, ], zielwert)
-        } else {
-          NA
-        }
-      })
-      
-      # Daten mit Prognosedatum erweitern
-      data$PROGNOSE_datum <- as.Date(prognosen, origin = "1970-01-01")
-      
-      # Gefilterter Datensatz für Darstellung
-      plot_data <- data %>%
-        filter(!is.na(PROGNOSE_datum)) %>%
-        filter(datum >= input$filter_daterange[1] + 30)
-      
-      # highcharter Plot
-      highchart() %>%
-        hc_xAxis(type = "datetime", title = list(text = "Datum")) %>%
-        hc_yAxis(type = "datetime", title = list(text = "errechnetes Datum")) %>%
-        hc_add_series(
-          data = list_parse2(
-            data.frame(
-              x = datetime_to_timestamp(plot_data$datum),
-              y = datetime_to_timestamp(plot_data$PROGNOSE_datum)
-            )
-          ),
-          type = "line",
-          name = "Prognose-Datum",
-          color = "#0072B2"
-        ) %>%
-        hc_tooltip(formatter = JS("
-    function () {
-      return '<b>Datum:</b> ' + Highcharts.dateFormat('%Y-%m-%d', this.x) + 
-             '<br><b>Prognose:</b> ' + Highcharts.dateFormat('%Y-%m-%d', this.y);
-    }
-  "))
-      
-    })
   })
 }
