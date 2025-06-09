@@ -1,9 +1,0 @@
-diese daten werden automatisch via git aktulaisiert.
-
-dazu dient das file ./R/update_data_depot.R
-
-es scraped stündlich aktualisierte daten von finanzen.net
-
-beispielhafte sturktur:
-datum,preis
-2025-06-06,264.65

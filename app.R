@@ -33,11 +33,6 @@ library(jsonlite)
 
 library(dplyr)
 
-# scrape latest wallet & stock data ============================================
-
-#source("./functions/updatedata_wallet.R")
-#source("./functions/updatedata_depot.R")
-
 
 # read manual data =============================================================
 
@@ -45,47 +40,28 @@ source("./functions/readdata_manual.R")
 data_manual <- readdata_maual()
 
 
-# read historical hata =========================================================
+# load historical price data ===================================================
 
-# ziel ist aus den Preisen den anzahl der aktien/sparbriefs, etc. den gesamtwert je 
-# depot / sparbrief zu berechnen
+source("./functions/load_price_data.R")
+source("./functions/createdata_portfolio.R")
 
-source("./functions/readdata_historical.R")
-
-#data_depot <- readdata_historical(datapath = "./data/depot/")
 data_depot <- bind_rows(
-  read.csv("https://raw.githubusercontent.com/soeren-schwabbauer/finanzen/main/data/depot/IE00B5BMR087.csv") %>% mutate(id = "IE00B5BMR087"),
-  read.csv("https://raw.githubusercontent.com/soeren-schwabbauer/finanzen/main/data/depot/IE00BK5BQT80.csv") %>% mutate(id = "IE00BK5BQT80"),
-  read.csv("https://raw.githubusercontent.com/soeren-schwabbauer/finanzen/main/data/depot/LU0908500753.csv") %>% mutate(id = "LU0908500753")
-) %>%
-  
-  mutate(datum = as.Date(datum)) %>%
-  group_by(id) %>%
-  complete(datum = seq.Date(min(datum), Sys.Date(), by = "day")) %>%
-  fill(preis, .direction = "down") %>%
-  ungroup()
+  load_price_data("IE00B5BMR087", type = "depot"),
+  load_price_data("IE00BK5BQT80", type = "depot"),
+  load_price_data("LU0908500753", type = "depot")
+)
 
-#data_wallet <- readdata_historical(datapath = "./data/wallet/")
-data_wallet <- bind_rows(
-  read.csv("https://raw.githubusercontent.com/soeren-schwabbauer/finanzen/main/data/wallet/BTC.csv") %>% mutate(id = "BTC")
-) %>%
-  
-  mutate(datum = as.Date(datum)) %>%
-  group_by(id) %>%
-  complete(datum = seq.Date(min(datum), Sys.Date(), by = "day")) %>%
-  fill(preis, .direction = "down") %>%
-  ungroup()
+data_wallet <- load_price_data("BTC", type = "wallet")
 
-data_sparbrief <- readdata_historical(datapath = "./data/sparbrief/")
-
-
+data_sparbrief <- load_price_data(id = "Sparbrief_ING_231207", type = "sparbrief")
 
 data_historical <- list(depot = data_depot, sparbrief = data_sparbrief, wallet = data_wallet)
 
-source("./functions/createdata_portfolio.R")
+# portfolio data has information on amount and price, and computes the saldo
 data_portfolio <- createdata_portfolio(manualdata = data_manual, historicaldata = data_historical)
 
 
+# add inflation data ===========================================================
 
 data_inflation <- read.csv("./data/inflation.csv", comment.char = "#")
 data_inflation$datum <- as.Date(paste0("01-", gsub("\\.", "", data_inflation$datum)), format = "%d-%b%y")

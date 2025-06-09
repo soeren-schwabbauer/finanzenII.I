@@ -8,6 +8,7 @@ readdata_maual <- function(datapath = "./data/manual/", konto = NULL) {
   
   filenames_csv <- list.files(path = datapath)
   filenames_csv <- filenames_csv[filenames_csv != "gruppen.csv"]
+  filenames_csv <- filenames_csv[filenames_csv != "inflation.csv"]
   
   filter_typID <- list.files(datapath)[!str_detect(list.files(datapath), "gruppen.csv")]
   filenames_csv <- filenames_csv[str_detect(filenames_csv, str_c(filter_typID, collapse = "|"))]  
